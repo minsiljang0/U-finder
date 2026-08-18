@@ -103,12 +103,12 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 border-r border-slate-200 bg-white flex-col h-screen sticky top-0">
-        <div className="h-16 flex items-center gap-2 px-5 border-b border-slate-100">
+        <Link to="/" className="h-16 flex items-center gap-2 px-5 border-b border-slate-100 hover:bg-slate-50 transition-colors">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center shrink-0">
             <Crown className="w-[18px] h-[18px] text-white" />
           </div>
           <span className="font-bold text-slate-900">슈퍼파인더</span>
-        </div>
+        </Link>
         <div className="flex-1 overflow-y-auto py-4">
           <SidebarContent />
         </div>
@@ -124,12 +124,12 @@ export default function Layout() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
           <div className="absolute left-0 top-0 bottom-0 w-72 bg-white flex flex-col">
             <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
-              <div className="flex items-center gap-2">
+              <Link to="/" className="flex items-center gap-2" onClick={() => setDrawerOpen(false)}>
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center">
                   <Crown className="w-[18px] h-[18px] text-white" />
                 </div>
                 <span className="font-bold text-slate-900">슈퍼파인더</span>
-              </div>
+              </Link>
               <button onClick={() => setDrawerOpen(false)} className="text-slate-500">
                 <X className="w-5 h-5" />
               </button>
