@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Crown, Menu, X, User, LogOut } from "lucide-react";
 import { NAV_ITEMS } from "./nav";
+import { useAuth, signOut } from "../lib/useAuth";
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -39,25 +40,29 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+  const email = user?.email ?? "";
+  const initial = email ? email[0].toUpperCase() : "나";
+
   return (
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold"
+        className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold"
       >
-        나
+        {initial}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-slate-200 z-20 overflow-hidden">
             <div className="p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                나
+              <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold">
+                {initial}
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-900 truncate">개인 사용자</div>
-                <div className="text-xs text-slate-500 truncate">로컬 전용 · 계정 없음</div>
+                <div className="text-sm font-semibold text-slate-900 truncate">{email || "개인 사용자"}</div>
+                <div className="text-xs text-slate-500 truncate">Supabase 계정</div>
               </div>
             </div>
             <div className="border-t border-slate-100">
@@ -70,13 +75,13 @@ function ProfileMenu() {
               </Link>
               <button
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 text-left"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  signOut();
+                }}
               >
-                <LogOut className="w-4 h-4" /> 초기화 (로컬 데이터 유지)
+                <LogOut className="w-4 h-4" /> 로그아웃
               </button>
-            </div>
-            <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-400 text-center">
-              개인 사용 전용 로컬 클론 · 인증 없음
             </div>
           </div>
         </>
@@ -88,6 +93,8 @@ function ProfileMenu() {
 export default function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  const initial = user?.email ? user.email[0].toUpperCase() : "나";
   const current = NAV_ITEMS.find((n) => (n.path === "/" ? location.pathname === "/" : location.pathname.startsWith(n.path))) ?? NAV_ITEMS[0];
 
   return (
@@ -95,7 +102,7 @@ export default function Layout() {
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-64 shrink-0 border-r border-slate-200 bg-white flex-col h-screen sticky top-0">
         <div className="h-16 flex items-center gap-2 px-5 border-b border-slate-100">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center shrink-0">
             <Crown className="w-[18px] h-[18px] text-white" />
           </div>
           <span className="font-bold text-slate-900">슈퍼파인더</span>
@@ -104,7 +111,7 @@ export default function Layout() {
           <SidebarContent />
         </div>
         <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">나</div>
+          <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">{initial}</div>
           <span className="text-xs text-slate-400">v0.1.0</span>
         </div>
       </aside>
@@ -116,7 +123,7 @@ export default function Layout() {
           <div className="absolute left-0 top-0 bottom-0 w-72 bg-white flex flex-col">
             <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center">
                   <Crown className="w-[18px] h-[18px] text-white" />
                 </div>
                 <span className="font-bold text-slate-900">슈퍼파인더</span>
@@ -129,7 +136,7 @@ export default function Layout() {
               <SidebarContent onNavigate={() => setDrawerOpen(false)} />
             </div>
             <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">나</div>
+              <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-semibold">{initial}</div>
               <span className="text-xs text-slate-400">v0.1.0</span>
             </div>
           </div>

@@ -4,11 +4,11 @@ import { useState } from "react";
 
 const BENEFITS = [
   { label: "조회수 폭발 쇼츠 검색", note: "무제한 (필터 자유)" },
-  { label: "황금 채널 발굴기", note: "실시간 무제한 분석" },
+  { label: "슈퍼 채널 발굴기", note: "실시간 무제한 분석" },
   { label: "터진 영상 실시간 추적", note: "실시간 무제한" },
   { label: "채널 랭킹", note: "무제한" },
   { label: "신규 기능 우선 제공", note: "베타 기능 즉시 제공" },
-  { label: "고객 지원", note: "듀오랩스 전용 지원" },
+  { label: "고객 지원", note: "비즈니스 지원센터" },
 ];
 
 export default function Pricing() {
@@ -62,7 +62,7 @@ export default function Pricing() {
           </div>
           <div className="text-xs text-slate-400 mb-4">매월 자동결제 · 언제든 해지</div>
           <div className="border-t border-violet-100 pt-4 text-sm text-slate-600 mb-6">
-            황금 채널 발굴기 · 쇼츠 검색 · 터진 영상 · 채널 랭킹 등 <b>모든 기능 무제한</b>
+            슈퍼 채널 발굴기 · 쇼츠 검색 · 터진 영상 · 채널 랭킹 등 <b>모든 기능 무제한</b>
           </div>
           <button
             onClick={startPremium}

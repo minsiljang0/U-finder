@@ -131,7 +131,7 @@ export default function ShortsFinder() {
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runSearch()}
             placeholder="검색어를 입력하세요 (예: 요리, 운동, 재테크...)"
-            className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
           />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
@@ -206,7 +206,7 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+        className="w-full h-10 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
       >
         {options.map((o) => (
           <option key={o.id} value={o.id}>

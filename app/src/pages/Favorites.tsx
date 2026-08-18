@@ -46,7 +46,7 @@ export default function Favorites() {
           (channels.length === 0 ? (
             <Empty
               title="저장한 채널이 없습니다"
-              subtitle={"황금 채널 발굴기 / 조회수 폭발 쇼츠 찾기 / 터진 영상 페이지에서\n카드 우상단 별 버튼을 눌러 저장하세요."}
+              subtitle={"슈퍼 채널 발굴기 / 조회수 폭발 쇼츠 찾기 / 터진 영상 페이지에서\n카드 우상단 별 버튼을 눌러 저장하세요."}
             />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -78,7 +78,7 @@ export default function Favorites() {
           (videos.length === 0 ? (
             <Empty
               title="저장한 영상이 없습니다"
-              subtitle={"황금 채널 발굴기 / 조회수 폭발 쇼츠 찾기 / 터진 영상 페이지에서\n카드 좌상단 별 버튼을 눌러 저장하세요."}
+              subtitle={"슈퍼 채널 발굴기 / 조회수 폭발 쇼츠 찾기 / 터진 영상 페이지에서\n카드 좌상단 별 버튼을 눌러 저장하세요."}
             />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

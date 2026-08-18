@@ -1,29 +1,30 @@
 #!/usr/bin/env node
 // 슈퍼파인더 프로젝트 관리용 로컬 MCP 서버.
 // 어느 Claude Code 세션에서든(이 프로젝트를 열면) 아래 도구로 프로젝트 현황을 조회/기록할 수 있다.
-// fresh-season류 프로젝트의 관리 MCP 패턴(list_tables/get_rows/upsert_row/run_sql/append_note)을 참고해
-// 이 프로젝트(로컬 SQLite, GitHub/Supabase 없음) 규모에 맞게 로컬 stdio 서버로 구현했다.
+// 데이터는 Supabase(pyplpivswdbrjytfqclm)에 저장되어, 로컬 SQLite와 달리 이 프로젝트를 아는
+// 다른 도구/세션에서도 같은 데이터를 공유해서 볼 수 있다.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { db, nowIso } from "./db.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { selectAllSimple, upsertRow as supaUpsert, insertRow, updateRow, deleteRow as supaDelete, runSelectSql } from "./supabase.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLAN_PATH = path.join(__dirname, "..", "PLAN.md");
 
 const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
+const nowIso = () => new Date().toISOString();
 
-const server = new McpServer({ name: "superfinder-mcp", version: "0.1.0" });
+const server = new McpServer({ name: "superfinder-mcp", version: "0.2.0" });
 
 server.registerTool(
   "list_tables",
   {
     title: "테이블 목록",
-    description: "슈퍼파인더 관리 DB(SQLite)의 테이블 목록을 반환한다: app_config, dev_notes, known_issues, tasks",
+    description: "슈퍼파인더 관리 DB(Supabase)의 테이블 목록을 반환한다: app_config, dev_notes, known_issues, tasks",
   },
   async () => ({ content: [{ type: "text", text: JSON.stringify(TABLES) }] })
 );
@@ -32,11 +33,11 @@ server.registerTool(
   "get_rows",
   {
     title: "테이블 행 조회",
-    description: "지정한 테이블의 전체 행을 조회한다.",
+    description: "지정한 테이블의 전체 행을 Supabase에서 조회한다.",
     inputSchema: { table: z.enum(TABLES) },
   },
   async ({ table }) => {
-    const rows = db.prepare(`SELECT * FROM ${table} ORDER BY rowid DESC`).all();
+    const rows = await selectAllSimple(table);
     return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
   }
 );
@@ -44,23 +45,16 @@ server.registerTool(
 server.registerTool(
   "run_sql",
   {
-    title: "읽기 전용 SQL 실행",
-    description: "SELECT 쿼리만 실행 가능한 읽기 전용 SQL 도구. INSERT/UPDATE/DELETE는 거부된다 (upsert_row/delete_row 사용).",
+    title: "읽기 전용 조회",
+    description: "'select * from <table>' 형태의 조회만 지원(Supabase REST 제약). 그 외엔 get_rows를 쓰세요.",
     inputSchema: { query: z.string() },
   },
   async ({ query }) => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed.startsWith("select")) {
-      return {
-        content: [{ type: "text", text: "거부됨: run_sql은 SELECT만 허용합니다. 쓰기는 upsert_row/delete_row를 사용하세요." }],
-        isError: true,
-      };
-    }
     try {
-      const rows = db.prepare(query).all();
+      const rows = await runSelectSql(query);
       return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
     } catch (e) {
-      return { content: [{ type: "text", text: `SQL 오류: ${e.message}` }], isError: true };
+      return { content: [{ type: "text", text: e.message }], isError: true };
     }
   }
 );
@@ -78,37 +72,28 @@ server.registerTool(
   },
   async ({ table, data }) => {
     const now = nowIso();
-    if (table === "known_issues") {
-      db.prepare(
-        `INSERT INTO known_issues (feature, status, note, updated_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(feature) DO UPDATE SET status=excluded.status, note=excluded.note, updated_at=excluded.updated_at`
-      ).run(String(data.feature), String(data.status ?? "unknown"), String(data.note ?? ""), now);
-    } else if (table === "app_config") {
-      db.prepare(
-        `INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
-      ).run(String(data.key), String(data.value ?? ""), now);
-    } else if (table === "dev_notes") {
-      db.prepare("INSERT INTO dev_notes (note, created_at) VALUES (?, ?)").run(String(data.note ?? ""), now);
-    } else if (table === "tasks") {
-      if (data.id) {
-        db.prepare("UPDATE tasks SET subject=?, status=?, note=?, updated_at=? WHERE id=?").run(
-          String(data.subject ?? ""),
-          String(data.status ?? "pending"),
-          data.note ? String(data.note) : null,
-          now,
-          Number(data.id)
+    try {
+      if (table === "known_issues") {
+        await supaUpsert(
+          "known_issues",
+          { feature: data.feature, status: data.status ?? "unknown", note: data.note ?? "", updated_at: now },
+          "feature"
         );
-      } else {
-        db.prepare("INSERT INTO tasks (subject, status, note, updated_at) VALUES (?, ?, ?, ?)").run(
-          String(data.subject ?? ""),
-          String(data.status ?? "pending"),
-          data.note ? String(data.note) : null,
-          now
-        );
+      } else if (table === "app_config") {
+        await supaUpsert("app_config", { key: data.key, value: data.value ?? "", updated_at: now }, "key");
+      } else if (table === "dev_notes") {
+        await insertRow("dev_notes", { note: data.note ?? "" });
+      } else if (table === "tasks") {
+        if (data.id) {
+          await updateRow("tasks", "id", data.id, { subject: data.subject, status: data.status ?? "pending", note: data.note ?? null, updated_at: now });
+        } else {
+          await insertRow("tasks", { subject: data.subject ?? "", status: data.status ?? "pending", note: data.note ?? null, updated_at: now });
+        }
       }
+      return { content: [{ type: "text", text: "OK" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
     }
-    return { content: [{ type: "text", text: "OK" }] };
   }
 );
 
@@ -120,10 +105,13 @@ server.registerTool(
     inputSchema: { table: z.enum(TABLES), id: z.union([z.string(), z.number()]) },
   },
   async ({ table, id }) => {
-    if (table === "known_issues") db.prepare("DELETE FROM known_issues WHERE feature=?").run(String(id));
-    else if (table === "app_config") db.prepare("DELETE FROM app_config WHERE key=?").run(String(id));
-    else db.prepare(`DELETE FROM ${table} WHERE id=?`).run(Number(id));
-    return { content: [{ type: "text", text: "OK" }] };
+    try {
+      const col = table === "known_issues" ? "feature" : table === "app_config" ? "key" : "id";
+      await supaDelete(table, col, id);
+      return { content: [{ type: "text", text: "OK" }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
+    }
   }
 );
 
@@ -140,12 +128,12 @@ server.registerTool(
   "append_dev_note",
   {
     title: "진행 노트 기록",
-    description: "dev_notes 테이블에 새 노트를 남기고, PLAN.md 하단 '진행 로그' 섹션에도 함께 append한다.",
+    description: "dev_notes 테이블(Supabase)에 새 노트를 남기고, PLAN.md 하단 '진행 로그' 섹션에도 함께 append한다.",
     inputSchema: { note: z.string() },
   },
   async ({ note }) => {
     const now = nowIso();
-    db.prepare("INSERT INTO dev_notes (note, created_at) VALUES (?, ?)").run(note, now);
+    await insertRow("dev_notes", { note });
 
     let plan = fs.existsSync(PLAN_PATH) ? fs.readFileSync(PLAN_PATH, "utf8") : "";
     if (!plan.includes("## 8. 진행 로그")) {
@@ -162,7 +150,7 @@ server.registerTool(
   "get_known_issues",
   { title: "알려진 이슈 조회", description: "현재 구현 상태/한계로 기록된 known_issues 전체를 반환한다." },
   async () => {
-    const rows = db.prepare("SELECT * FROM known_issues ORDER BY updated_at DESC").all();
+    const rows = await selectAllSimple("known_issues", "updated_at.desc");
     return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
   }
 );

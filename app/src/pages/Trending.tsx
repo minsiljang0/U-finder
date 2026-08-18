@@ -18,7 +18,7 @@ const SORT_TABS = [
 ];
 
 const STATUS_COLORS: Record<TrendStatus, string> = {
-  신규: "text-blue-600",
+  신규: "text-indigo-600",
   상승: "text-emerald-600",
   하락: "text-red-500",
   유지: "text-slate-400",

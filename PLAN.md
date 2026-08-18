@@ -112,23 +112,31 @@ ams = clamp(
       App.tsx, main.tsx, index.css
     package.json, vite.config.ts
   mcp/                       ← 프로젝트 관리용 로컬 MCP 서버 (§9 참고)
-    index.mjs, db.mjs, selftest.mjs
-    data/superfinder.db      ← SQLite (app_config/dev_notes/known_issues/tasks)
+    index.mjs, supabase.mjs, selftest.mjs, supabase_schema.sql
 ```
 
 ## 9. 관리용 MCP 서버 (언제든 이어서 관리하기 위한 장치)
 
 `mcp/index.mjs`는 이 프로젝트 전용 로컬 MCP 서버다. `C:\Users\user\Downloads\.mcp.json`에 `superfinder`로 등록해뒀기 때문에,
 **이 Downloads 폴더에서 시작하는 모든 Claude Code 세션**은 별도 설정 없이 아래 도구를 바로 쓸 수 있다.
+데이터는 로컬 파일이 아니라 **Supabase 프로젝트 `u-finder`(https://pyplpivswdbrjytfqclm.supabase.co)** 에 저장된다
+(`mcp/supabase.mjs`가 REST API로 접근, secret key 사용 — RLS 우회하는 백엔드 전용 키라 절대 브라우저 코드에 넣지 않음).
 
 - `get_plan` — 이 PLAN.md 전체를 반환 (메모리 없는 새 세션의 첫 진입점으로 적합)
 - `get_known_issues` / `upsert_row(known_issues, ...)` — 위 §0 한계 표와 동일한 내용을 구조화된 데이터로 조회·갱신
-- `append_dev_note` — 새 노트를 SQLite에 남기고 동시에 이 파일의 §8 진행 로그에도 append (기록이 두 곳에 흩어지지 않게)
-- `list_tables` / `get_rows` / `run_sql`(SELECT 전용) / `upsert_row` / `delete_row` — DB 범용 CRUD
+- `append_dev_note` — 새 노트를 Supabase에 남기고 동시에 이 파일의 §8 진행 로그에도 append (기록이 두 곳에 흩어지지 않게)
+- `list_tables` / `get_rows` / `run_sql`(`select * from <table>` 형태만) / `upsert_row` / `delete_row` — DB 범용 CRUD
 
-**한계**: 이 MCP는 로컬 stdio 서버라 fresh-season 계열의 `mcp__<uuid>__*` 서버들과 달리 claude.ai 웹/모바일 등 다른 클라이언트에서는 접속할 수 없고,
-**이 컴퓨터에서 Claude Code로 Downloads 폴더를 열었을 때만** 사용 가능하다. 다른 기기·클라이언트에서도 접속하려면 Supabase 같은 실제 백엔드 DB +
-어딘가에 호스팅된 원격 MCP 서버가 필요한데, 이건 새 Supabase 프로젝트/호스팅 계정이 필요해서 이번 세션에선 만들지 않았다 (필요하면 다음 단계로 진행 가능).
+**한계**: 이 MCP 서버 프로세스 자체는 여전히 로컬 stdio라 fresh-season 계열의 `mcp__<uuid>__*` 서버들처럼 claude.ai 웹/모바일에서 바로 붙을 순 없다
+(그러려면 이 서버를 어딘가에 24/7 호스팅해야 함). 다만 데이터 자체는 이제 Supabase에 있으므로, 다른 스크립트·MCP·앱이 같은 프로젝트를 바로 읽고 쓸 수 있다.
+
+## 10. Supabase / 배포 / 로그인 (2026-08-18 추가)
+
+- **Supabase 프로젝트**: `u-finder` (ref `pyplpivswdbrjytfqclm`, Org: minsiljang0's Org). URL/키는 `app/.env`(gitignore됨)와 `mcp/supabase.mjs`에 있음.
+- **로그인**: Supabase Auth 이메일/비밀번호 방식으로 실제 구현됨 (`app/src/lib/useAuth.ts`, `app/src/pages/Login.tsx`). 세션 없으면 `App.tsx`가 로그인 화면을 먼저 보여줌. 아직 계정이 없다면 로그인 화면에서 "가입하기"로 본인 계정 하나만 만들면 됨 (개인 전용이라 다른 사람이 가입할 이유는 없지만, Supabase 기본 설정상 가입 자체는 누구나 가능 — 필요하면 Supabase 대시보드 Auth 설정에서 가입 막을 수 있음).
+- **결제**: 여전히 미구현(UI 데모만). Toss Payments는 실제 상점/사업자 연동이 필요해서 개인용 클론 범위 밖으로 남겨둠.
+- **GitHub 저장소**: `helpfulfood` 계정이 flagged 상태라 git push가 서버측에서 막혀 `https://github.com/minsiljang0/U-finder` 로 이전해서 사용 중.
+- **배포**: Vercel에 `minsiljang0/U-finder` 연결, Root Directory `app`, 프레임워크 Vite로 배포. `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` 환경변수를 Vercel 프로젝트 설정에도 등록해야 배포본에서 로그인이 동작함.
 
 ## 6. 진행 순서
 
@@ -150,4 +158,6 @@ ams = clamp(
 (mcp/index.mjs의 append_dev_note 도구로 자동 기록됨 — 새 Claude 세션은 get_plan/get_known_issues로 최신 상태를 확인할 것)
 
 - [2026-08-18] 8개 페이지 전체 구현 완료, 브라우저로 UI 실동작 검증 완료(빈상태/에러상태/실제 API 오류 응답까지 확인). 대본(자막) 기능은 유튜브 서버측 차단으로 미동작 확인. 관리용 MCP 서버(mcp/) 구축 완료.
-- [2026-08-18T21:09:28.734Z] helpfulfood 계정이 GitHub에서 플래그되어(flagged) OAuth 제3자 앱 인증이 막혀있어서 일반 브라우저 로그인이 계속 실패함. Personal Access Token(classic, repo 권한)으로 우회해서 해결. helpfulfood/U-finder에 app/+mcp/+PLAN.md 전체 push 완료(커밋 4745e42). 향후 이 계정으로 다시 push할 때도 OAuth 보다는 PAT 사용을 권장.
+- [2026-08-18] helpfulfood 계정이 GitHub에서 flagged 상태라 OAuth 로그인은 물론 git push(smart-http)까지 서버측에서 차단됨(REST API는 정상). minsiljang0/U-finder로 옮겨서 push 성공, Vercel 배포 진행.
+- [2026-08-18] Supabase 프로젝트(u-finder, pyplpivswdbrjytfqclm) 연결. app_config/dev_notes/known_issues/tasks 테이블 생성(RLS 활성화), 로컬 SQLite 데이터 이전 완료. mcp/index.mjs가 이제 로컬 SQLite 대신 이 Supabase를 사용.
+- [2026-08-18] Supabase Auth로 실제 로그인/회원가입 구현(이메일+비밀번호). App.tsx가 세션 없으면 Login 화면을 띄우도록 게이트 추가.

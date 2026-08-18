@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import Layout from "./components/Layout";
 import TrialBanner from "./components/TrialBanner";
+import Login from "./pages/Login";
 import GoldenFinder from "./pages/GoldenFinder";
 import ShortsFinder from "./pages/ShortsFinder";
 import Trending from "./pages/Trending";
@@ -9,6 +11,7 @@ import Favorites from "./pages/Favorites";
 import ApiKeySetup from "./pages/ApiKeySetup";
 import Subscription from "./pages/Subscription";
 import Pricing from "./pages/Pricing";
+import { useAuth } from "./lib/useAuth";
 
 function PageWithBanner({ children }: { children: React.ReactNode }) {
   return (
@@ -20,6 +23,20 @@ function PageWithBanner({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Login />;
+  }
+
   return (
     <BrowserRouter>
       <Routes>

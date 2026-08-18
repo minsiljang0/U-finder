@@ -157,7 +157,7 @@ export default function GoldenFinder() {
                 key={t}
                 onClick={() => setVideoType(t)}
                 className={`h-9 px-4 rounded-full text-sm font-semibold ${
-                  videoType === t ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                  videoType === t ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {t === "short" ? "쇼츠" : "롱폼"}
@@ -175,7 +175,7 @@ export default function GoldenFinder() {
                   key={r.id}
                   onClick={() => setSubRange(r.id)}
                   className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap ${
-                    subRange === r.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                    subRange === r.id ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
                   {r.label}
@@ -191,7 +191,7 @@ export default function GoldenFinder() {
                   key={s.id}
                   onClick={() => setSort(s.id)}
                   className={`h-9 px-4 rounded-full text-sm font-semibold whitespace-nowrap ${
-                    sort === s.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                    sort === s.id ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
                   {s.label}
@@ -203,7 +203,7 @@ export default function GoldenFinder() {
       </div>
 
       {searched && !loading && !error && (
-        <div className="mb-5 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 flex items-center gap-2 text-sm text-blue-700">
+        <div className="mb-5 rounded-xl bg-indigo-50 border border-blue-100 px-4 py-3 flex items-center gap-2 text-sm text-indigo-700">
           <RefreshCw className="w-4 h-4" />
           매일 자정 00시(KST)에 새로운 채널로 자동 업데이트됩니다 — 이 클론은 버튼을 누를 때마다 실시간으로 다시 검색합니다.
         </div>

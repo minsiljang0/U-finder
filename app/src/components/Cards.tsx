@@ -42,15 +42,15 @@ export function ChannelStatCard({ data }: { data: ChannelStatCardData }) {
       </div>
       <div className="flex items-center justify-between text-xs mb-1">
         <span className="text-slate-400">일일 조회수</span>
-        <span className="text-amber-400 font-semibold">{formatCount(data.dailyViews)} 회/일</span>
+        <span className="text-cyan-400 font-semibold">{formatCount(data.dailyViews)} 회/일</span>
       </div>
       <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="text-slate-400">AMS 지수</span>
-        <span className="text-amber-400 font-semibold">{data.ams}</span>
+        <span className="text-cyan-400 font-semibold">{data.ams}</span>
       </div>
       <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full"
+          className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-400 rounded-full"
           style={{ width: `${Math.min(100, data.ams)}%` }}
         />
       </div>
@@ -96,7 +96,7 @@ export function VideoResultCard({ data }: { data: VideoResultCardData }) {
       href={`https://www.youtube.com/watch?v=${data.videoId}`}
       target="_blank"
       rel="noreferrer"
-      className="block bg-slate-900 rounded-2xl overflow-hidden hover:ring-2 hover:ring-blue-500/50 transition-all"
+      className="block bg-slate-900 rounded-2xl overflow-hidden hover:ring-2 hover:ring-indigo-500/50 transition-all"
     >
       <div className="relative aspect-[9/16] bg-slate-800">
         {data.thumbnail && <img src={data.thumbnail} alt="" className="w-full h-full object-cover" />}
@@ -146,7 +146,7 @@ export function VideoResultCard({ data }: { data: VideoResultCardData }) {
         {data.dailyViews !== undefined && (
           <div className="flex items-center justify-between text-xs mt-2">
             <span className="text-slate-500">일일 조회수</span>
-            <span className="text-amber-400 font-semibold">{formatCount(data.dailyViews)} 회/일</span>
+            <span className="text-cyan-400 font-semibold">{formatCount(data.dailyViews)} 회/일</span>
           </div>
         )}
         {data.growthPerHour !== undefined && (

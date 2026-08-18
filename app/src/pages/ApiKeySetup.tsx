@@ -42,7 +42,7 @@ export default function ApiKeySetup() {
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="AIzaSy..."
-              className="w-full h-11 pl-4 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="w-full h-11 pl-4 pr-10 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             />
             <button
               onClick={() => setShow((s) => !s)}
@@ -85,7 +85,7 @@ export default function ApiKeySetup() {
           <div className="mt-5 flex flex-col gap-5">
             <Step n={1} title="구글 클라우드 접속하기">
               먼저{" "}
-              <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-medium">
+              <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 underline font-medium">
                 구글 클라우드 콘솔 (console.cloud.google.com)
               </a>
               에 들어간 뒤, 평소 쓰는 <Kbd>구글 계정</Kbd>으로 로그인해 주세요.
@@ -113,7 +113,7 @@ export default function ApiKeySetup() {
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-4">
-      <div className="w-7 h-7 rounded-full bg-orange-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
+      <div className="w-7 h-7 rounded-full bg-indigo-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
         {n}
       </div>
       <div>

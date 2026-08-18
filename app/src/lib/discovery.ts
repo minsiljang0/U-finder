@@ -1,4 +1,4 @@
-// 황금 채널 발굴기 / 채널 랭킹에서 공유하는 "카테고리 검색 → 영상/채널 집계" 로직.
+// 슈퍼 채널 발굴기 / 채널 랭킹에서 공유하는 "카테고리 검색 → 영상/채널 집계" 로직.
 
 import { CATEGORIES, getCategory } from "./categoryPresets";
 import {
