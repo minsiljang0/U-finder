@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+app/verify-live.mjs
+mcp/data/*.db
+mcp/data/*.db-journal
+.DS_Store

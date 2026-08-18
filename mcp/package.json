@@ -1,0 +1,10 @@
+{
+  "name": "superfinder-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "superfinder-mcp": "./index.mjs" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}
