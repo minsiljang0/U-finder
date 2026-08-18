@@ -31,3 +31,18 @@ export async function signUpWithPassword(email: string, password: string) {
 export async function signOut() {
   return supabase.auth.signOut();
 }
+
+export async function signInWithGoogle() {
+  return supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin },
+  });
+}
+
+export async function updateDisplayName(name: string) {
+  return supabase.auth.updateUser({ data: { display_name: name } });
+}
+
+export async function updatePassword(password: string) {
+  return supabase.auth.updateUser({ password });
+}

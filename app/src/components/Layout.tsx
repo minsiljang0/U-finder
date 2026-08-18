@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Crown, Menu, X, User, LogOut } from "lucide-react";
 import { NAV_ITEMS } from "./nav";
 import { useAuth, signOut } from "../lib/useAuth";
+import Footer from "./Footer";
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -42,7 +43,8 @@ function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const email = user?.email ?? "";
-  const initial = email ? email[0].toUpperCase() : "나";
+  const displayName = (user?.user_metadata?.display_name as string) || "";
+  const initial = (displayName || email) ? (displayName || email)[0].toUpperCase() : "나";
 
   return (
     <div className="relative">
@@ -61,8 +63,8 @@ function ProfileMenu() {
                 {initial}
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-slate-900 truncate">{email || "개인 사용자"}</div>
-                <div className="text-xs text-slate-500 truncate">Supabase 계정</div>
+                <div className="text-sm font-semibold text-slate-900 truncate">{displayName || email || "개인 사용자"}</div>
+                <div className="text-xs text-slate-500 truncate">{email}</div>
               </div>
             </div>
             <div className="border-t border-slate-100">
@@ -162,6 +164,7 @@ export default function Layout() {
         </header>
         <main className="p-4 lg:p-8 max-w-[1200px] mx-auto">
           <Outlet />
+          <Footer />
         </main>
       </div>
     </div>
