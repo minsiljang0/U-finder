@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Crown, Menu, X, User, LogOut } from "lucide-react";
+import { Crown, Menu, X, User, LogOut, ShieldCheck } from "lucide-react";
 import { NAV_ITEMS } from "./nav";
 import { useAuth, signOut } from "../lib/useAuth";
 import Footer from "./Footer";
 
+const OWNER_EMAIL = "minsiljang0@gmail.com";
+
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useAuth();
+  const isOwner = user?.email === OWNER_EMAIL;
+
   return (
     <>
       <div className="px-2 mb-2">
@@ -35,6 +40,28 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </nav>
       </div>
+
+      {isOwner && (
+        <div className="px-2">
+          <div className="text-xs font-semibold text-slate-400 px-3 mb-2 mt-2">관리자</div>
+          <NavLink
+            to="/admin"
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              `w-full flex items-center gap-3 px-3 h-11 rounded-xl text-left transition-all text-sm font-medium ${
+                isActive ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md" : "text-slate-600 hover:bg-slate-100"
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <ShieldCheck className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                <span className="truncate">회원 관리</span>
+              </>
+            )}
+          </NavLink>
+        </div>
+      )}
     </>
   );
 }

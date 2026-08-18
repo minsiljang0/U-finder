@@ -12,6 +12,7 @@ import ApiKeySetup from "./pages/ApiKeySetup";
 import Subscription from "./pages/Subscription";
 import Pricing from "./pages/Pricing";
 import Policy from "./pages/Policy";
+import Admin from "./pages/Admin";
 import { useAuth } from "./lib/useAuth";
 
 function PageWithBanner({ children }: { children: React.ReactNode }) {
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/policy/:slug" element={<Policy />} />
+          <Route path="/admin" element={<Admin />} />
         </Route>
       </Routes>
     </BrowserRouter>
