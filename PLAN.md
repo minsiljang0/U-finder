@@ -136,7 +136,13 @@ ams = clamp(
 - **로그인**: Supabase Auth 이메일/비밀번호 방식으로 실제 구현됨 (`app/src/lib/useAuth.ts`, `app/src/pages/Login.tsx`). 세션 없으면 `App.tsx`가 로그인 화면을 먼저 보여줌. 아직 계정이 없다면 로그인 화면에서 "가입하기"로 본인 계정 하나만 만들면 됨 (개인 전용이라 다른 사람이 가입할 이유는 없지만, Supabase 기본 설정상 가입 자체는 누구나 가능 — 필요하면 Supabase 대시보드 Auth 설정에서 가입 막을 수 있음).
 - **결제**: 여전히 미구현(UI 데모만). Toss Payments는 실제 상점/사업자 연동이 필요해서 개인용 클론 범위 밖으로 남겨둠.
 - **GitHub 저장소**: `helpfulfood` 계정이 flagged 상태라 git push가 서버측에서 막혀 `https://github.com/minsiljang0/U-finder` 로 이전해서 사용 중.
-- **배포**: Vercel에 `minsiljang0/U-finder` 연결, Root Directory `app`, 프레임워크 Vite로 배포. `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` 환경변수를 Vercel 프로젝트 설정에도 등록해야 배포본에서 로그인이 동작함.
+- **배포**: Vercel에 `minsiljang0/U-finder` 연결, Root Directory `app`, 프레임워크 Vite로 배포. Vercel 프로젝트 Settings → Environment Variables에 아래 4개를 등록해야 배포본이 정상 동작함:
+  - `VITE_SUPABASE_URL` = `https://pyplpivswdbrjytfqclm.supabase.co`
+  - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_IdRM7ZxF_ciZ9Pg-kNHjoA_4vCGR4D1`
+  - `SUPABASE_SECRET_KEY` = (Supabase 대시보드 API Keys에서 secret key 값, `app/api/mcp.js`가 서버사이드에서만 사용)
+  - `MCP_ACCESS_TOKEN` = `f32516c622e80d94ed92aa3d17c1ec32845933873c33c5e0` (원격 MCP 엔드포인트 접근용 토큰, 아무 값이나 바꿔도 됨)
+- **원격 MCP 엔드포인트**: `app/api/mcp.js`가 Vercel 서버리스 함수로 배포되어 `https://<배포도메인>/api/mcp`에서 Streamable HTTP MCP를 제공한다. `Authorization: Bearer <MCP_ACCESS_TOKEN>` 헤더 필요. 로컬 stdio MCP(`superfinder`)와 달리 이건 배포만 되면 **어느 기기·클라이언트에서든** 같은 Supabase 데이터에 접속 가능 — `.mcp.json`에 `"type": "http", "url": "https://<배포도메인>/api/mcp", "headers": {"Authorization": "Bearer <토큰>"}` 형태로 추가하면 됨(배포 URL 확정되면 추가 예정).
+- **브랜딩**: "황금" → "슈퍼"로 전체 변경, 컬러 테마를 원본의 amber/blue 계열에서 violet/indigo 계열로 전면 교체(느낌 다르게 해달라는 요청), "듀오랩스" 등 원본 회사명은 "비즈니스 지원센터"로 대체.
 
 ## 6. 진행 순서
 
@@ -161,3 +167,4 @@ ams = clamp(
 - [2026-08-18] helpfulfood 계정이 GitHub에서 flagged 상태라 OAuth 로그인은 물론 git push(smart-http)까지 서버측에서 차단됨(REST API는 정상). minsiljang0/U-finder로 옮겨서 push 성공, Vercel 배포 진행.
 - [2026-08-18] Supabase 프로젝트(u-finder, pyplpivswdbrjytfqclm) 연결. app_config/dev_notes/known_issues/tasks 테이블 생성(RLS 활성화), 로컬 SQLite 데이터 이전 완료. mcp/index.mjs가 이제 로컬 SQLite 대신 이 Supabase를 사용.
 - [2026-08-18] Supabase Auth로 실제 로그인/회원가입 구현(이메일+비밀번호). App.tsx가 세션 없으면 Login 화면을 띄우도록 게이트 추가.
+- [2026-08-18T22:07:44.634Z] Supabase Auth 로그인 구현(이메일/비밀번호), 전체 컬러 테마를 amber/blue에서 violet/indigo 기반으로 변경, '황금'→'슈퍼' 브랜드명 통일, 듀오랩스 사명 제거(비즈니스 지원센터로 대체). app/api/mcp.js로 원격 MCP 엔드포인트(Vercel 서버리스, Streamable HTTP) 추가 - MCP_ACCESS_TOKEN으로 접근 제한, 배포되면 어디서든 접속 가능. GitHub push protection이 mcp/supabase.mjs에 하드코딩된 secret key를 잡아냄 - env var 방식으로 수정 후 재커밋, minsiljang0/U-finder에 정상 push 완료.
