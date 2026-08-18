@@ -18,6 +18,13 @@ const PLAN_PATH = path.join(__dirname, "..", "PLAN.md");
 const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
 const nowIso = () => new Date().toISOString();
 
+const GITHUB_REPO = "minsiljang0/U-finder";
+function ghHeaders() {
+  const h = { "User-Agent": "superfinder-mcp" };
+  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  return h;
+}
+
 const server = new McpServer({ name: "superfinder-mcp", version: "0.2.0" });
 
 server.registerTool(
@@ -152,6 +159,42 @@ server.registerTool(
   async () => {
     const rows = await selectAllSimple("known_issues", "updated_at.desc");
     return { content: [{ type: "text", text: JSON.stringify(rows, null, 2) }] };
+  }
+);
+
+server.registerTool(
+  "list_github_files",
+  {
+    title: "GitHub 저장소 파일 목록",
+    description: `${GITHUB_REPO} 저장소의 특정 경로에 어떤 파일·폴더가 있는지 조회한다. path를 비우면 루트를 본다.`,
+    inputSchema: { path: z.string().optional(), ref: z.string().optional() },
+  },
+  async ({ path: p, ref }) => {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${p ?? ""}${ref ? `?ref=${ref}` : ""}`;
+    const res = await fetch(url, { headers: ghHeaders() });
+    if (!res.ok) return { content: [{ type: "text", text: `GitHub API 오류 (${res.status})` }], isError: true };
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [data];
+    const text = list.map((f) => `${f.type === "dir" ? "📁" : "📄"} ${f.path}${f.type === "file" ? ` (${f.size} bytes)` : ""}`).join("\n");
+    return { content: [{ type: "text", text }] };
+  }
+);
+
+server.registerTool(
+  "get_github_file",
+  {
+    title: "GitHub 파일 내용 조회",
+    description: `${GITHUB_REPO} 저장소의 특정 파일 내용을 텍스트로 가져온다. list_github_files로 경로 확인 후 사용.`,
+    inputSchema: { path: z.string(), ref: z.string().optional() },
+  },
+  async ({ path: p, ref }) => {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${p}${ref ? `?ref=${ref}` : ""}`;
+    const res = await fetch(url, { headers: ghHeaders() });
+    if (!res.ok) return { content: [{ type: "text", text: `GitHub API 오류 (${res.status})` }], isError: true };
+    const data = await res.json();
+    if (data.type !== "file") return { content: [{ type: "text", text: "파일이 아닙니다." }], isError: true };
+    const text = Buffer.from(data.content, "base64").toString("utf8");
+    return { content: [{ type: "text", text }] };
   }
 );
 

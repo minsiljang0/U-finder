@@ -7,10 +7,23 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 
 const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
+const GITHUB_REPO = "minsiljang0/U-finder";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://pyplpivswdbrjytfqclm.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY;
 const ACCESS_TOKEN = process.env.MCP_SHARED_SECRET;
+
+function ghHeaders() {
+  const h = { "User-Agent": "superfinder-mcp-remote" };
+  if (process.env.GITHUB_TOKEN) h.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  return h;
+}
+async function ghFetchFile(path, ref) {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}${ref ? `?ref=${ref}` : ""}`;
+  const res = await fetch(url, { headers: ghHeaders() });
+  if (!res.ok) throw new Error(`GitHub API 오류 (${res.status})`);
+  return res.json();
+}
 
 const REST = `${SUPABASE_URL}/rest/v1`;
 function headers() {
@@ -101,6 +114,58 @@ function buildServer() {
       const col = table === "known_issues" ? "feature" : table === "app_config" ? "key" : "id";
       await sb(`${table}?${col}=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
       return { content: [{ type: "text", text: "OK" }] };
+    }
+  );
+
+  server.registerTool(
+    "list_github_files",
+    {
+      title: "GitHub 저장소 파일 목록",
+      description: `${GITHUB_REPO} 저장소의 특정 경로에 어떤 파일·폴더가 있는지 조회한다. path를 비우면 루트를 본다.`,
+      inputSchema: { path: z.string().optional(), ref: z.string().optional() },
+    },
+    async ({ path: p, ref }) => {
+      try {
+        const data = await ghFetchFile(p ?? "", ref);
+        const list = Array.isArray(data) ? data : [data];
+        const text = list.map((f) => `${f.type === "dir" ? "📁" : "📄"} ${f.path}${f.type === "file" ? ` (${f.size} bytes)` : ""}`).join("\n");
+        return { content: [{ type: "text", text }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_github_file",
+    {
+      title: "GitHub 파일 내용 조회",
+      description: `${GITHUB_REPO} 저장소의 특정 파일 내용을 텍스트로 가져온다. list_github_files로 경로 확인 후 사용.`,
+      inputSchema: { path: z.string(), ref: z.string().optional() },
+    },
+    async ({ path: p, ref }) => {
+      try {
+        const data = await ghFetchFile(p, ref);
+        if (data.type !== "file") return { content: [{ type: "text", text: "파일이 아닙니다." }], isError: true };
+        const text = Buffer.from(data.content, "base64").toString("utf8");
+        return { content: [{ type: "text", text }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_plan",
+    { title: "PLAN.md 조회", description: "슈퍼파인더 기획서(PLAN.md, 저장소 루트) 전체 내용을 GitHub에서 가져온다." },
+    async () => {
+      try {
+        const data = await ghFetchFile("PLAN.md");
+        const text = Buffer.from(data.content, "base64").toString("utf8");
+        return { content: [{ type: "text", text }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
     }
   );
 
