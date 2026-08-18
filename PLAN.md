@@ -140,8 +140,13 @@ ams = clamp(
   - `VITE_SUPABASE_URL` = `https://pyplpivswdbrjytfqclm.supabase.co`
   - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_IdRM7ZxF_ciZ9Pg-kNHjoA_4vCGR4D1`
   - `SUPABASE_SECRET_KEY` = (Supabase 대시보드 API Keys에서 secret key 값, `app/api/mcp.js`가 서버사이드에서만 사용)
-  - `MCP_ACCESS_TOKEN` = `f32516c622e80d94ed92aa3d17c1ec32845933873c33c5e0` (원격 MCP 엔드포인트 접근용 토큰, 아무 값이나 바꿔도 됨)
-- **원격 MCP 엔드포인트**: `app/api/mcp.js`가 Vercel 서버리스 함수로 배포되어 `https://<배포도메인>/api/mcp`에서 Streamable HTTP MCP를 제공한다. `Authorization: Bearer <MCP_ACCESS_TOKEN>` 헤더 필요. 로컬 stdio MCP(`superfinder`)와 달리 이건 배포만 되면 **어느 기기·클라이언트에서든** 같은 Supabase 데이터에 접속 가능 — `.mcp.json`에 `"type": "http", "url": "https://<배포도메인>/api/mcp", "headers": {"Authorization": "Bearer <토큰>"}` 형태로 추가하면 됨(배포 URL 확정되면 추가 예정).
+  - `MCP_SHARED_SECRET` = `ufinder_admin_2026` (원격 MCP 엔드포인트 접근용 공유 비밀키. 이름/방식 모두 fresh-season과 동일하게 맞춤)
+- **원격 MCP 엔드포인트**: `app/api/mcp.js`가 Vercel 서버리스 함수로 배포되어 `https://u-finder-app.vercel.app/api/mcp`에서 Streamable HTTP MCP를 제공한다.
+  인증은 **헤더가 아니라 URL 쿼리파라미터** `?key=<MCP_SHARED_SECRET>` 방식이다 — claude.ai의 "커스텀 커넥터 추가" 화면은 헤더 토큰 입력칸이 없고,
+  완전 무인증으로 두면 claude.ai가 OAuth 클라이언트 동적등록(DCR)을 강제로 시도하다 실패해서 연결 자체가 안 되는 버그가 있기 때문
+  (fresh-season의 `app/api/mcp/route.js` 소스에서 동일한 문제와 해결책을 실제로 확인함).
+  claude.ai Settings → Connectors → 추가 시 URL: `https://u-finder-app.vercel.app/api/mcp?key=ufinder_admin_2026`, OAuth 필드는 비워둠.
+  로컬 stdio MCP(`superfinder`)와 달리 이건 배포만 되면 **어느 기기·클라이언트에서든** 같은 Supabase 데이터에 접속 가능 — `.mcp.json`에도 `superfinder-remote`로 등록해둠.
 - **브랜딩**: "황금" → "슈퍼"로 전체 변경, 컬러 테마를 원본의 amber/blue 계열에서 violet/indigo 계열로 전면 교체(느낌 다르게 해달라는 요청), "듀오랩스" 등 원본 회사명은 "비즈니스 지원센터"로 대체.
 
 ## 6. 진행 순서

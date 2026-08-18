@@ -1,6 +1,6 @@
 // 원격 MCP 엔드포인트 (Vercel 서버리스 함수). 로컬 stdio MCP(mcp/index.mjs)와 동일한 도구를
 // HTTP로 제공해서, 이 컴퓨터가 아닌 어디서든(claude.ai 등) 같은 Supabase 프로젝트 데이터를
-// 조회/기록할 수 있게 한다. MCP_ACCESS_TOKEN 환경변수로 접근을 제한한다(공개 인터넷에 떠 있으므로).
+// 조회/기록할 수 있게 한다. MCP_SHARED_SECRET 환경변수로 접근을 제한한다(공개 인터넷에 떠 있으므로).
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -10,7 +10,7 @@ const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://pyplpivswdbrjytfqclm.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY;
-const ACCESS_TOKEN = process.env.MCP_ACCESS_TOKEN;
+const ACCESS_TOKEN = process.env.MCP_SHARED_SECRET;
 
 const REST = `${SUPABASE_URL}/rest/v1`;
 function headers() {
@@ -111,11 +111,11 @@ function buildServer() {
 // 게다가 완전 무인증으로 두면 claude.ai가 OAuth 클라이언트 동적등록(DCR)을 강제로
 // 시도하다 실패해서 연결 자체가 안 되는 별도 버그가 있다(fresh-season/route.js에서도
 // 같은 문제로 ?key= 쿼리파라미터 방식으로 되돌렸음). 그래서 헤더 대신 URL 쿼리파라미터로 인증한다:
-// https://<배포도메인>/api/mcp?key=<MCP_ACCESS_TOKEN>
+// https://<배포도메인>/api/mcp?key=<MCP_SHARED_SECRET>
 export default async function handler(req, res) {
   if (!ACCESS_TOKEN) {
     res.statusCode = 500;
-    res.end("MCP_ACCESS_TOKEN not configured");
+    res.end("MCP_SHARED_SECRET not configured");
     return;
   }
   const url = new URL(req.url, `https://${req.headers.host}`);
