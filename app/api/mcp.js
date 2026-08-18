@@ -107,16 +107,22 @@ function buildServer() {
   return server;
 }
 
+// claude.ai 커스텀 커넥터 추가 화면은 헤더 토큰 입력칸이 없고 URL만 받는다.
+// 게다가 완전 무인증으로 두면 claude.ai가 OAuth 클라이언트 동적등록(DCR)을 강제로
+// 시도하다 실패해서 연결 자체가 안 되는 별도 버그가 있다(fresh-season/route.js에서도
+// 같은 문제로 ?key= 쿼리파라미터 방식으로 되돌렸음). 그래서 헤더 대신 URL 쿼리파라미터로 인증한다:
+// https://<배포도메인>/api/mcp?key=<MCP_ACCESS_TOKEN>
 export default async function handler(req, res) {
   if (!ACCESS_TOKEN) {
     res.statusCode = 500;
     res.end("MCP_ACCESS_TOKEN not configured");
     return;
   }
-  const auth = req.headers["authorization"] || "";
-  if (auth !== `Bearer ${ACCESS_TOKEN}`) {
+  const url = new URL(req.url, `https://${req.headers.host}`);
+  const key = url.searchParams.get("key");
+  if (key !== ACCESS_TOKEN) {
     res.statusCode = 401;
-    res.end("Unauthorized");
+    res.end("Unauthorized (key 쿼리파라미터 확인)");
     return;
   }
 
