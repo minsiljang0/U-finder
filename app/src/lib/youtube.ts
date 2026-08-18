@@ -82,8 +82,9 @@ export async function searchVideos(opts: {
   videoDuration?: "short" | "long" | "any";
   maxResults?: number;
   regionCode?: string;
-}): Promise<YtSearchItem[]> {
-  const data = await apiGet<{ items: YtSearchItem[] }>("search", {
+  pageToken?: string;
+}): Promise<{ items: YtSearchItem[]; nextPageToken?: string }> {
+  const data = await apiGet<{ items: YtSearchItem[]; nextPageToken?: string }>("search", {
     part: "snippet",
     type: "video",
     q: opts.q,
@@ -93,8 +94,27 @@ export async function searchVideos(opts: {
     maxResults: opts.maxResults ?? 25,
     regionCode: opts.regionCode ?? "KR",
     relevanceLanguage: "ko",
+    pageToken: opts.pageToken,
   });
-  return data.items.filter((it) => it.id.videoId);
+  return { items: data.items.filter((it) => it.id.videoId), nextPageToken: data.nextPageToken };
+}
+
+/** 여러 페이지를 순회하며 조회수 범위처럼 "전체 후보 중 일부"를 걸러야 하는 검색에 사용.
+ * order=viewCount로 검색하면 상위 조회수 영상만 반환되어 낮은 조회수 구간 필터와 결합 시
+ * 결과가 0개가 되는 문제가 있어, 대표성 있는 후보군을 모으기 위해 페이지네이션한다. */
+export async function searchVideosMultiPage(
+  opts: Omit<Parameters<typeof searchVideos>[0], "pageToken">,
+  pages = 3
+): Promise<YtSearchItem[]> {
+  const all: YtSearchItem[] = [];
+  let pageToken: string | undefined;
+  for (let i = 0; i < pages; i++) {
+    const { items, nextPageToken } = await searchVideos({ ...opts, pageToken });
+    all.push(...items);
+    if (!nextPageToken) break;
+    pageToken = nextPageToken;
+  }
+  return all;
 }
 
 export async function getVideosById(ids: string[]): Promise<YtVideo[]> {

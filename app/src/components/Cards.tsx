@@ -1,8 +1,8 @@
 import { Star } from "lucide-react";
 import ScriptButton from "./ScriptButton";
 import { formatCount, formatRelativeDays } from "../lib/ams";
-import { toggleFavChannel, toggleFavVideo, isFavChannel, isFavVideo } from "../lib/storage";
-import { useState } from "react";
+import { toggleFavChannel, toggleFavVideo, isFavChannel, isFavVideo } from "../lib/favorites";
+import { useEffect, useState } from "react";
 
 export interface ChannelStatCardData {
   id: string;
@@ -76,12 +76,20 @@ export interface VideoResultCardData {
 }
 
 export function VideoResultCard({ data }: { data: VideoResultCardData }) {
-  const [fav, setFav] = useState(() => isFavVideo(data.videoId));
+  const [fav, setFav] = useState(false);
 
-  function onStar(e: React.MouseEvent) {
+  useEffect(() => {
+    let alive = true;
+    isFavVideo(data.videoId).then((v) => alive && setFav(v));
+    return () => {
+      alive = false;
+    };
+  }, [data.videoId]);
+
+  async function onStar(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    const next = toggleFavVideo({
+    const next = await toggleFavVideo({
       id: data.videoId,
       title: data.title,
       thumbnail: data.thumbnail,
@@ -172,13 +180,22 @@ export function ChannelFavButton({
   subscribers: number;
   className?: string;
 }) {
-  const [fav, setFav] = useState(() => isFavChannel(id));
+  const [fav, setFav] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    isFavChannel(id).then((v) => alive && setFav(v));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
   return (
     <button
-      onClick={(e) => {
+      onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        setFav(toggleFavChannel({ id, title, thumbnail, subscribers, savedAt: Date.now() }));
+        setFav(await toggleFavChannel({ id, title, thumbnail, subscribers, savedAt: Date.now() }));
       }}
       className={className}
     >

@@ -5,6 +5,7 @@ import { getApiKey } from "../lib/storage";
 import { ApiKeyWarning, EmptyState, ErrorBox, LoadingGrid } from "../components/StateViews";
 import { ChannelStatCard, VideoResultCard } from "../components/Cards";
 import { RefreshCw } from "lucide-react";
+import { formatCount } from "../lib/ams";
 
 const SUB_RANGES = [
   { id: "all", label: "전체" },
@@ -30,6 +31,7 @@ export default function GoldenFinder() {
   const [videos, setVideos] = useState<EnrichedVideo[]>([]);
   const [channels, setChannels] = useState<Map<string, EnrichedChannel>>(new Map());
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [viewThreshold, setViewThreshold] = useState<number | null>(null);
 
   async function runSearch(categoryId: string) {
     if (!getApiKey()) {
@@ -40,13 +42,14 @@ export default function GoldenFinder() {
     setLoading(true);
     setError(null);
     try {
-      const { videos, channels } = await fetchCategoryVideos({
+      const { videos, channels, viewThresholdUsed } = await fetchCategoryVideos({
         categoryId,
         videoType,
         publishedWithinDays: 60,
       });
       setVideos(videos);
       setChannels(channels);
+      setViewThreshold(viewThresholdUsed);
       setUpdatedAt(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "데이터를 불러오지 못했습니다.");
@@ -220,8 +223,12 @@ export default function GoldenFinder() {
 
       {searched && !loading && !error && filteredSorted.length > 0 && (
         <>
-          <div className="text-sm text-slate-500 mb-3">
+          <div className="text-sm text-slate-500 mb-1">
             발견된 영상 <b className="text-slate-900">{filteredSorted.length}개</b> (채널 {uniqueChannelCount}개)
+          </div>
+          <div className="text-xs text-slate-400 mb-3">
+            * 구독자 20만명 미만 채널 중, 최근 60일 이내 {formatCount(viewThreshold ?? 500000)}+ 조회수 떡상 영상이 있는 채널을 우선 수집합니다.
+            카테고리당 30개 미만일 경우 50만 → 30만 → 10만 → 5만 조회수 순으로 기준을 낮춰 보충합니다.
           </div>
 
           {topChannels.length > 0 && (

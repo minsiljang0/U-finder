@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Rocket, Search } from "lucide-react";
-import { getVideosById, isShort, searchVideos, thumbOf } from "../lib/youtube";
+import { getVideosById, isShort, searchVideosMultiPage, thumbOf } from "../lib/youtube";
 import { getApiKey } from "../lib/storage";
 import { computeAmsScore, computeDailyViews, daysSince, hoursSince } from "../lib/ams";
 import { ApiKeyWarning, EmptyState, ErrorBox, LoadingGrid } from "../components/StateViews";
@@ -61,13 +61,19 @@ export default function ShortsFinder() {
     try {
       const uploadOpt = UPLOAD_OPTS.find((u) => u.id === upload)!;
       const publishedAfter = new Date(Date.now() - uploadOpt.days * 86400000).toISOString();
-      const items = await searchVideos({
-        q: q.trim() || "쇼츠",
-        order: sort === "date" ? "date" : "viewCount",
-        publishedAfter,
-        videoDuration: "short",
-        maxResults: 30,
-      });
+      // order=viewCount로 가져오면 최상위 조회수 영상만 반환되어, 낮은 조회수 구간 필터와
+      // 결합할 때 결과가 0개가 되는 문제가 있었다. order=date + 여러 페이지로 대표성 있는
+      // 후보군을 모은 뒤, 최종 정렬은 아래에서 조회수 범위로 거른 다음 따로 적용한다.
+      const items = await searchVideosMultiPage(
+        {
+          q: q.trim() || "쇼츠",
+          order: "date",
+          publishedAfter,
+          videoDuration: "short",
+          maxResults: 50,
+        },
+        3
+      );
       const videoIds = [...new Set(items.map((i) => i.id.videoId!).filter(Boolean))];
       const videos = await getVideosById(videoIds);
       const shorts = videos.filter(isShort);

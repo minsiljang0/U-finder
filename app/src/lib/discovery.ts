@@ -34,6 +34,12 @@ export interface EnrichedChannel {
 
 const ALL_QUERIES = ["요즘 뜨는 쇼츠", "인기 급상승 영상", "화제의 채널"];
 
+// 원본 사이트 UI 문구("구독자 20만명 미만 채널 중... 카테고리당 30개 미만일 경우
+// 50만→30만→10만→5만 조회수 순으로 기준을 낮춰 보충")를 그대로 재현한 실제 필터링 로직.
+export const SUBSCRIBER_CAP = 200_000;
+export const MIN_RESULTS = 30;
+export const VIEW_THRESHOLD_TIERS = [500_000, 300_000, 100_000, 50_000];
+
 export function queriesForCategory(categoryId: string): string[] {
   if (categoryId === "all") return ALL_QUERIES;
   return getCategory(categoryId)?.queries ?? ALL_QUERIES;
@@ -45,7 +51,7 @@ export async function fetchCategoryVideos(opts: {
   publishedWithinDays: number;
   maxQueries?: number;
   perQuery?: number;
-}): Promise<{ videos: EnrichedVideo[]; channels: Map<string, EnrichedChannel> }> {
+}): Promise<{ videos: EnrichedVideo[]; channels: Map<string, EnrichedChannel>; viewThresholdUsed: number }> {
   const queries = queriesForCategory(opts.categoryId).slice(0, opts.maxQueries ?? 3);
   const publishedAfter = new Date(Date.now() - opts.publishedWithinDays * 86400000).toISOString();
 
@@ -56,7 +62,9 @@ export async function fetchCategoryVideos(opts: {
         order: "viewCount",
         publishedAfter,
         maxResults: opts.perQuery ?? 16,
-      }).catch(() => [])
+      })
+        .then((r) => r.items)
+        .catch(() => [])
     )
   );
 
@@ -96,7 +104,20 @@ export async function fetchCategoryVideos(opts: {
     };
   });
 
-  return { videos: enriched, channels };
+  // 구독자 20만명 미만 채널만 우선 수집.
+  const underCap = enriched.filter((v) => (channels.get(v.channelId)?.subscribers ?? 0) < SUBSCRIBER_CAP);
+
+  // 카테고리당 30개 미만이면 조회수 기준을 50만 → 30만 → 10만 → 5만 순으로 낮춰가며 보충.
+  let selected = underCap.filter((v) => v.viewCount >= VIEW_THRESHOLD_TIERS[0]);
+  let viewThresholdUsed = VIEW_THRESHOLD_TIERS[0];
+  for (const tier of VIEW_THRESHOLD_TIERS.slice(1)) {
+    if (selected.length >= MIN_RESULTS) break;
+    selected = underCap.filter((v) => v.viewCount >= tier);
+    viewThresholdUsed = tier;
+  }
+  // 최하위 기준으로도 30개가 안 되면, 그 기준을 만족하는 전체(=selected)를 그대로 사용.
+
+  return { videos: selected, channels, viewThresholdUsed };
 }
 
 export function subscriberRangeFilter(range: string) {

@@ -20,15 +20,20 @@ export interface RankedChannel {
  */
 export async function fetchChannelRanking(opts: { maxCategories?: number }): Promise<RankedChannel[]> {
   const cats = CATEGORIES.slice(0, opts.maxCategories ?? 5);
+  const publishedAfter = new Date(Date.now() - 14 * 86400000).toISOString();
+
+  // videoDuration을 지정하지 않고 검색하면 "쇼츠/롱폼" 실제 비중과 무관하게 조회수가 높은
+  // 쪽으로만 쏠려서 타입 필터가 사실상 무의미해지는 문제가 있었다. 쇼츠/롱폼을 각각 따로
+  // 검색해 채널별로 정확히 집계한다.
   const searchResults = await Promise.all(
-    cats.map((c) =>
-      searchVideos({
-        q: c.queries[0],
-        order: "viewCount",
-        publishedAfter: new Date(Date.now() - 14 * 86400000).toISOString(),
-        maxResults: 12,
-      }).catch(() => [])
-    )
+    cats.flatMap((c) => [
+      searchVideos({ q: c.queries[0], order: "viewCount", publishedAfter, videoDuration: "short", maxResults: 8 })
+        .then((r) => r.items)
+        .catch(() => []),
+      searchVideos({ q: c.queries[0], order: "viewCount", publishedAfter, videoDuration: "long", maxResults: 8 })
+        .then((r) => r.items)
+        .catch(() => []),
+    ])
   );
   const videoIds = [...new Set(searchResults.flat().map((it) => it.id.videoId!).filter(Boolean))];
   const videos = await getVideosById(videoIds);
@@ -36,16 +41,15 @@ export async function fetchChannelRanking(opts: { maxCategories?: number }): Pro
   const channels = await getChannelsById(channelIds);
   const channelMap = new Map(channels.map((c) => [c.id, c]));
 
-  const byChannel = new Map<string, { dailyViewsSum: number; count: number; hasShort: boolean; hasLong: boolean }>();
+  const byChannel = new Map<string, { dailyViewsSum: number; shortCount: number; longCount: number }>();
   for (const v of videos) {
     const views = Number(v.statistics.viewCount ?? 0);
     const days = daysSince(v.snippet.publishedAt);
     const dv = computeDailyViews(views, days);
-    const entry = byChannel.get(v.snippet.channelId) ?? { dailyViewsSum: 0, count: 0, hasShort: false, hasLong: false };
+    const entry = byChannel.get(v.snippet.channelId) ?? { dailyViewsSum: 0, shortCount: 0, longCount: 0 };
     entry.dailyViewsSum += dv;
-    entry.count += 1;
-    if (isShort(v)) entry.hasShort = true;
-    else entry.hasLong = true;
+    if (isShort(v)) entry.shortCount += 1;
+    else entry.longCount += 1;
     byChannel.set(v.snippet.channelId, entry);
   }
 
@@ -59,7 +63,7 @@ export async function fetchChannelRanking(opts: { maxCategories?: number }): Pro
         title: ch.snippet.title,
         thumbnail: thumbOf(ch.snippet),
         subscribers: Number(ch.statistics.subscriberCount ?? 0),
-        isShort: agg.hasShort && !agg.hasLong ? true : agg.hasShort && agg.hasLong ? true : false,
+        isShort: agg.shortCount >= agg.longCount,
         dailyViews,
         weeklyViews: dailyViews * 7,
         monthlyViews: dailyViews * 30,

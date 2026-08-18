@@ -1,10 +1,8 @@
-// 로컬 전용(개인 사용) 데이터 저장소. 원본의 Supabase/Clerk 대신 localStorage 사용.
+// 로컬(브라우저 단위) 설정 저장소. API 키는 민감정보라 서버에 보내지 않고 브라우저에만 둔다.
+// 즐겨찾기는 회원별 데이터라 lib/favorites.ts(Supabase)로 옮겼다.
 
 const KEYS = {
   apiKey: "sf.youtubeApiKey",
-  favChannels: "sf.favChannels",
-  favVideos: "sf.favVideos",
-  favKeywords: "sf.favKeywords",
   trialStart: "sf.trialStart",
   premium: "sf.premium",
   rankingSnapshot: "sf.rankingSnapshot",
@@ -33,86 +31,6 @@ export function setApiKey(key: string) {
 
 export function clearApiKey() {
   localStorage.removeItem(KEYS.apiKey);
-}
-
-export interface FavChannel {
-  id: string;
-  title: string;
-  thumbnail: string;
-  subscribers: number;
-  savedAt: number;
-}
-
-export interface FavVideo {
-  id: string;
-  title: string;
-  thumbnail: string;
-  channelTitle: string;
-  savedAt: number;
-}
-
-export interface FavKeyword {
-  keyword: string;
-  savedAt: number;
-}
-
-export function getFavChannels(): FavChannel[] {
-  return readJSON(KEYS.favChannels, []);
-}
-export function toggleFavChannel(channel: FavChannel): boolean {
-  const list = getFavChannels();
-  const idx = list.findIndex((c) => c.id === channel.id);
-  if (idx >= 0) {
-    list.splice(idx, 1);
-    writeJSON(KEYS.favChannels, list);
-    return false;
-  }
-  list.unshift(channel);
-  writeJSON(KEYS.favChannels, list);
-  return true;
-}
-export function isFavChannel(id: string): boolean {
-  return getFavChannels().some((c) => c.id === id);
-}
-
-export function getFavVideos(): FavVideo[] {
-  return readJSON(KEYS.favVideos, []);
-}
-export function toggleFavVideo(video: FavVideo): boolean {
-  const list = getFavVideos();
-  const idx = list.findIndex((v) => v.id === video.id);
-  if (idx >= 0) {
-    list.splice(idx, 1);
-    writeJSON(KEYS.favVideos, list);
-    return false;
-  }
-  list.unshift(video);
-  writeJSON(KEYS.favVideos, list);
-  return true;
-}
-export function isFavVideo(id: string): boolean {
-  return getFavVideos().some((v) => v.id === id);
-}
-
-export function getFavKeywords(): FavKeyword[] {
-  return readJSON(KEYS.favKeywords, []);
-}
-export function toggleFavKeyword(keyword: string): boolean {
-  const list = getFavKeywords();
-  const idx = list.findIndex((k) => k.keyword === keyword);
-  if (idx >= 0) {
-    list.splice(idx, 1);
-    writeJSON(KEYS.favKeywords, list);
-    return false;
-  }
-  list.unshift({ keyword, savedAt: Date.now() });
-  writeJSON(KEYS.favKeywords, list);
-  return true;
-}
-
-export function removeFavKeyword(keyword: string) {
-  const list = getFavKeywords().filter((k) => k.keyword !== keyword);
-  writeJSON(KEYS.favKeywords, list);
 }
 
 export function getTrialStart(): number {

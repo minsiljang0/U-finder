@@ -1,6 +1,7 @@
-import { getChannelsById, getMostPopular, isShort, thumbOf, type YtVideo } from "./youtube";
+import { getChannelsById, getMostPopular, getVideosById, isShort, searchVideos, thumbOf, type YtVideo } from "./youtube";
 import { hoursSince } from "./ams";
 import { getRankingSnapshot, saveRankingSnapshot, type RankingSnapshotEntry } from "./storage";
+import { CATEGORIES } from "./categoryPresets";
 
 export type TrendStatus = "신규" | "상승" | "하락" | "유지";
 
@@ -21,8 +22,34 @@ export interface TrendingItem {
   isShort: boolean;
 }
 
+/**
+ * 유튜브 공식 mostPopular 차트는 롱폼 위주라 쇼츠가 거의 안 걸린다.
+ * 그래서 쇼츠 트렌드는 카테고리 프리셋으로 최근 영상을 검색해 별도로 보충한다.
+ */
+async function fetchShortsPool(): Promise<YtVideo[]> {
+  const publishedAfter = new Date(Date.now() - 4 * 86400000).toISOString();
+  const queries = CATEGORIES.slice(0, 6).map((c) => c.queries[0]);
+  const results = await Promise.all(
+    queries.map((q) =>
+      searchVideos({ q, order: "viewCount", publishedAfter, videoDuration: "short", maxResults: 15 })
+        .then((r) => r.items)
+        .catch(() => [])
+    )
+  );
+  const ids = [...new Set(results.flat().map((it) => it.id.videoId!).filter(Boolean))];
+  return getVideosById(ids);
+}
+
 export async function fetchTrending(): Promise<{ items: TrendingItem[]; counts: Record<TrendStatus, number> }> {
-  const videos = await getMostPopular({ maxResults: 50 });
+  const [longform, shorts] = await Promise.all([getMostPopular({ maxResults: 50 }), fetchShortsPool()]);
+  const seen = new Set<string>();
+  const videos: YtVideo[] = [];
+  for (const v of [...shorts, ...longform]) {
+    if (seen.has(v.id)) continue;
+    seen.add(v.id);
+    videos.push(v);
+  }
+
   const channelIds = [...new Set(videos.map((v) => v.snippet.channelId))];
   const channels = await getChannelsById(channelIds);
   const channelMap = new Map(channels.map((c) => [c.id, c]));
