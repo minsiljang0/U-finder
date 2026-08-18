@@ -11,6 +11,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectAllSimple, upsertRow as supaUpsert, insertRow, updateRow, deleteRow as supaDelete, runSelectSql } from "./supabase.mjs";
+import {
+  searchVideos,
+  getVideosById,
+  getChannelsById,
+  getMostPopular,
+  isShort,
+  daysSince,
+  hoursSince,
+  fmt,
+  categoryQueries,
+  CATEGORY_LIST,
+} from "./youtube.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLAN_PATH = path.join(__dirname, "..", "PLAN.md");
@@ -195,6 +207,195 @@ server.registerTool(
     if (data.type !== "file") return { content: [{ type: "text", text: "파일이 아닙니다." }], isError: true };
     const text = Buffer.from(data.content, "base64").toString("utf8");
     return { content: [{ type: "text", text }] };
+  }
+);
+
+// ── 회원님 대신 실제로 유튜브를 검색하는 도구들. app/api/mcp.js(원격)와 동일 로직. ──
+
+server.registerTool(
+  "discover_channels",
+  {
+    title: "카테고리별 채널 발굴 (슈퍼 채널 발굴기)",
+    description:
+      `카테고리(예: ${CATEGORY_LIST.join(", ")}, 또는 "전체")로 최근 60일 내 떡상 영상을 보유한 채널을 찾는다. ` +
+      "구독자 20만명 미만 채널만, 카테고리당 결과가 30개 미만이면 조회수 기준을 낮춰가며 보충한다.",
+    inputSchema: { category: z.string().optional(), videoType: z.enum(["short", "long"]).default("short") },
+  },
+  async ({ category, videoType }) => {
+    try {
+      const queries = categoryQueries(category).slice(0, 3);
+      const publishedAfter = new Date(Date.now() - 60 * 86400000).toISOString();
+      const results = await Promise.all(
+        queries.map((q) => searchVideos({ q, order: "viewCount", publishedAfter, maxResults: 16 }).then((r) => r.items).catch(() => []))
+      );
+      const ids = [...new Set(results.flat().map((it) => it.id.videoId).filter(Boolean))];
+      const videos = await getVideosById(ids);
+      const filtered = videos.filter((v) => (videoType === "short" ? isShort(v) : !isShort(v)));
+      const channelIds = [...new Set(filtered.map((v) => v.snippet.channelId))];
+      const channels = await getChannelsById(channelIds);
+      const chMap = new Map(channels.map((c) => [c.id, c]));
+
+      const underCap = filtered.filter((v) => Number(chMap.get(v.snippet.channelId)?.statistics.subscriberCount ?? 0) < 200_000);
+      const tiers = [500_000, 300_000, 100_000, 50_000];
+      let selected = underCap.filter((v) => Number(v.statistics.viewCount ?? 0) >= tiers[0]);
+      for (const t of tiers.slice(1)) {
+        if (selected.length >= 30) break;
+        selected = underCap.filter((v) => Number(v.statistics.viewCount ?? 0) >= t);
+      }
+
+      const lines = selected.slice(0, 30).map((v) => {
+        const ch = chMap.get(v.snippet.channelId);
+        const views = Number(v.statistics.viewCount ?? 0);
+        const days = Math.max(1, daysSince(v.snippet.publishedAt));
+        return `- "${v.snippet.title}" | 채널: ${v.snippet.channelTitle}(구독자 ${fmt(ch?.statistics.subscriberCount)}명) | 조회수 ${fmt(views)} | 일일 ${fmt(Math.round(views / days))}회/일 | ${Math.floor(days)}일 전 | https://youtube.com/watch?v=${v.id}`;
+      });
+      return { content: [{ type: "text", text: `${category ?? "전체"} 카테고리, ${selected.length}개 발견:\n\n${lines.join("\n")}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
+    }
+  }
+);
+
+server.registerTool(
+  "search_shorts",
+  {
+    title: "조건 맞춤 쇼츠 검색 (조회수 폭발 쇼츠 찾기)",
+    description: "키워드 + 업로드기간/최대구독자/조회수범위로 쇼츠를 검색한다.",
+    inputSchema: {
+      query: z.string(),
+      uploadWithinDays: z.number().default(7),
+      maxSubscribers: z.number().optional(),
+      minViews: z.number().default(10000),
+      maxViews: z.number().optional(),
+      sort: z.enum(["views", "date", "velocity"]).default("views"),
+    },
+  },
+  async ({ query, uploadWithinDays, maxSubscribers, minViews, maxViews, sort }) => {
+    try {
+      const publishedAfter = new Date(Date.now() - uploadWithinDays * 86400000).toISOString();
+      let pageToken;
+      const items = [];
+      for (let i = 0; i < 3; i++) {
+        const r = await searchVideos({ q: query, order: "date", publishedAfter, videoDuration: "short", maxResults: 50, pageToken });
+        items.push(...r.items);
+        if (!r.nextPageToken) break;
+        pageToken = r.nextPageToken;
+      }
+      const ids = [...new Set(items.map((i) => i.id.videoId).filter(Boolean))];
+      const videos = (await getVideosById(ids)).filter(isShort);
+      const channelIds = [...new Set(videos.map((v) => v.snippet.channelId))];
+      const channels = await getChannelsById(channelIds);
+      const chMap = new Map(channels.map((c) => [c.id, c]));
+
+      let results = videos
+        .map((v) => ({
+          v,
+          views: Number(v.statistics.viewCount ?? 0),
+          subs: Number(chMap.get(v.snippet.channelId)?.statistics.subscriberCount ?? 0),
+          velocity: Number(v.statistics.viewCount ?? 0) / hoursSince(v.snippet.publishedAt),
+        }))
+        .filter((r) => (maxSubscribers ? r.subs <= maxSubscribers : true))
+        .filter((r) => r.views >= minViews && (maxViews ? r.views < maxViews : true));
+
+      if (sort === "velocity") results.sort((a, b) => b.velocity - a.velocity);
+      else if (sort === "date") results.sort((a, b) => (a.v.snippet.publishedAt < b.v.snippet.publishedAt ? 1 : -1));
+      else results.sort((a, b) => b.views - a.views);
+
+      const lines = results.slice(0, 30).map((r) => {
+        const days = Math.max(1, daysSince(r.v.snippet.publishedAt));
+        return `- "${r.v.snippet.title}" | 채널: ${r.v.snippet.channelTitle}(구독자 ${fmt(r.subs)}명) | 조회수 ${fmt(r.views)} | ${Math.floor(days)}일 전 | https://youtube.com/watch?v=${r.v.id}`;
+      });
+      return { content: [{ type: "text", text: `"${query}" 검색, ${results.length}개 발견:\n\n${lines.join("\n")}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
+    }
+  }
+);
+
+server.registerTool(
+  "get_trending",
+  {
+    title: "터진 영상 (급등 영상)",
+    description: "유튜브 인기차트 + 카테고리 검색 기반 쇼츠 풀을 합쳐 조회수 성장 속도(급등순)로 정렬해 보여준다.",
+    inputSchema: { type: z.enum(["short", "long", "all"]).default("short"), limit: z.number().default(20) },
+  },
+  async ({ type, limit }) => {
+    try {
+      const [longform, shortsSearch] = await Promise.all([
+        getMostPopular({ maxResults: 50 }),
+        Promise.all(
+          CATEGORY_LIST.slice(0, 6).map((c) =>
+            searchVideos({ q: categoryQueries(c)[0], order: "viewCount", publishedAfter: new Date(Date.now() - 4 * 86400000).toISOString(), videoDuration: "short", maxResults: 15 })
+              .then((r) => r.items)
+              .catch(() => [])
+          )
+        ),
+      ]);
+      const shortIds = [...new Set(shortsSearch.flat().map((it) => it.id.videoId).filter(Boolean))];
+      const shorts = await getVideosById(shortIds);
+      const seen = new Set();
+      const all = [];
+      for (const v of [...shorts, ...longform]) {
+        if (seen.has(v.id)) continue;
+        seen.add(v.id);
+        all.push(v);
+      }
+      const filtered = all.filter((v) => (type === "all" ? true : type === "short" ? isShort(v) : !isShort(v)));
+      const withGrowth = filtered.map((v) => ({ v, growth: Number(v.statistics.viewCount ?? 0) / hoursSince(v.snippet.publishedAt) }));
+      withGrowth.sort((a, b) => b.growth - a.growth);
+
+      const lines = withGrowth.slice(0, limit).map((r, idx) => {
+        return `#${idx + 1} "${r.v.snippet.title}" | ${r.v.snippet.channelTitle} | 조회수 ${fmt(r.v.statistics.viewCount)} | +${fmt(Math.round(r.growth))}/h | https://youtube.com/watch?v=${r.v.id}`;
+      });
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
+    }
+  }
+);
+
+server.registerTool(
+  "get_channel_ranking",
+  {
+    title: "채널 랭킹",
+    description: "여러 카테고리를 순회 검색해 채널별 조회수 합산 랭킹을 근사로 계산한다.",
+    inputSchema: { limit: z.number().default(20) },
+  },
+  async ({ limit }) => {
+    try {
+      const cats = CATEGORY_LIST.slice(0, 5);
+      const publishedAfter = new Date(Date.now() - 14 * 86400000).toISOString();
+      const results = await Promise.all(
+        cats.flatMap((c) => [
+          searchVideos({ q: categoryQueries(c)[0], order: "viewCount", publishedAfter, videoDuration: "short", maxResults: 8 }).then((r) => r.items).catch(() => []),
+          searchVideos({ q: categoryQueries(c)[0], order: "viewCount", publishedAfter, videoDuration: "long", maxResults: 8 }).then((r) => r.items).catch(() => []),
+        ])
+      );
+      const ids = [...new Set(results.flat().map((it) => it.id.videoId).filter(Boolean))];
+      const videos = await getVideosById(ids);
+      const channelIds = [...new Set(videos.map((v) => v.snippet.channelId))];
+      const channels = await getChannelsById(channelIds);
+      const chMap = new Map(channels.map((c) => [c.id, c]));
+
+      const byChannel = new Map();
+      for (const v of videos) {
+        const views = Number(v.statistics.viewCount ?? 0);
+        const days = Math.max(1, daysSince(v.snippet.publishedAt));
+        const entry = byChannel.get(v.snippet.channelId) ?? { sum: 0 };
+        entry.sum += views / days;
+        byChannel.set(v.snippet.channelId, entry);
+      }
+      const ranked = [...byChannel.entries()]
+        .map(([id, agg]) => ({ id, ch: chMap.get(id), dailyViews: Math.round(agg.sum) }))
+        .filter((r) => r.ch)
+        .sort((a, b) => b.dailyViews - a.dailyViews)
+        .slice(0, limit);
+
+      const lines = ranked.map((r, idx) => `#${idx + 1} ${r.ch.snippet.title} | 구독자 ${fmt(r.ch.statistics.subscriberCount)}명 | 일 조회수(근사) ${fmt(r.dailyViews)}`);
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: e.message }], isError: true };
+    }
   }
 );
 

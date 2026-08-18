@@ -126,9 +126,20 @@ ams = clamp(
 - `get_known_issues` / `upsert_row(known_issues, ...)` — 위 §0 한계 표와 동일한 내용을 구조화된 데이터로 조회·갱신
 - `append_dev_note` — 새 노트를 Supabase에 남기고 동시에 이 파일의 §8 진행 로그에도 append (기록이 두 곳에 흩어지지 않게)
 - `list_tables` / `get_rows` / `run_sql`(`select * from <table>` 형태만) / `upsert_row` / `delete_row` — DB 범용 CRUD
+- `list_github_files` / `get_github_file` — `minsiljang0/U-finder` 저장소 파일 조회 (fresh-season 패턴과 동일)
 
-**한계**: 이 MCP 서버 프로세스 자체는 여전히 로컬 stdio라 fresh-season 계열의 `mcp__<uuid>__*` 서버들처럼 claude.ai 웹/모바일에서 바로 붙을 순 없다
-(그러려면 이 서버를 어딘가에 24/7 호스팅해야 함). 다만 데이터 자체는 이제 Supabase에 있으므로, 다른 스크립트·MCP·앱이 같은 프로젝트를 바로 읽고 쓸 수 있다.
+**"회원님 대신 실제로 유튜브를 검색"하는 도구 (2026-08-18 추가, app/api/_youtube.js·mcp/youtube.mjs 공유):**
+- `discover_channels` — 슈퍼 채널 발굴기와 동일 로직(카테고리, 구독자 20만 미만 캡, 조회수 기준 단계완화)
+- `search_shorts` — 조회수 폭발 쇼츠 찾기와 동일 로직(키워드+업로드기간+구독자상한+조회수범위)
+- `get_trending` — 터진 영상과 동일 로직(인기차트+카테고리쇼츠풀 합쳐 급등순 정렬)
+- `get_channel_ranking` — 채널 랭킹과 동일 로직(카테고리 순회검색 후 채널별 조회수 합산)
+
+이 4개는 `YOUTUBE_API_KEY` 환경변수(서버사이드, 회원님 API 키)가 필요하다 — 로컬은 `.mcp.json`의 superfinder env에, 원격은 Vercel 프로젝트 환경변수에 등록.
+**둘 다 이미 등록됨** (로컬은 즉시 사용 가능; 원격은 Vercel에 `YOUTUBE_API_KEY` 추가 후 재배포해야 반영).
+
+**한계**: 로컬 `mcp/index.mjs` 프로세스 자체는 이 컴퓨터에서 Claude Code를 열었을 때만 동작한다.
+원격은 `app/api/mcp.js`(Vercel 서버리스, Streamable HTTP)로 배포되어 있어 **claude.ai 등 어디서든** 접속 가능 —
+claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-app.vercel.app/api/mcp?key=ufinder_admin_2026` 연결 완료됨(연결명: 슈퍼파인더-Mcp).
 
 ## 10. Supabase / 배포 / 로그인 (2026-08-18 추가)
 
@@ -176,3 +187,4 @@ ams = clamp(
 - [2026-08-18T22:29:07.016Z] 실제 API 키로 테스트하다 발견된 버그 3건 수정: (1) 황금/슈퍼 채널 발굴기에 원본과 동일한 '구독자 20만명 미만 + 조회수 50만→30만→10만→5만 단계적 완화' 로직 추가(이전엔 이 필터링 자체가 없었음). (2) 조회수 폭발 쇼츠 찾기: order=viewCount로 검색 후 낮은 조회수 구간(1만~5만 등)으로 필터링하면 항상 0개가 나오는 구조적 버그 발견 - order=date+페이지네이션(3페이지)으로 대표성 있는 후보군을 모으도록 수정. (3) 터진 영상: mostPopular 차트가 롱폼 위주라 기본 탭인 '쇼츠'가 거의 항상 0개였음 - 카테고리 검색 기반 쇼츠 풀을 별도로 추가해 합침. 채널 랭킹의 쇼츠/롱폼 타입 필터도 죽은 코드(항상 true)였던 걸 발견해 shortCount/longCount 기반으로 수정. 즐겨찾기를 localStorage에서 Supabase(fav_channels/fav_videos/fav_keywords, user_id+RLS)로 이전해 회원별 저장되도록 함.
 - [2026-08-18T22:40:04.113Z] Vercel 배포 확인 완료: 프론트엔드(Supabase URL 정상 baked-in), 원격 MCP 엔드포인트(/api/mcp, 실제 tools/call로 Supabase known_issues 조회까지 curl로 검증 완료), 관리자 페이지(minsiljang0@gmail.com 전용, 가입 회원 목록 조회) 전부 정상 동작 확인. .mcp.json에 superfinder-remote(http) 항목 추가해서 로컬 stdio 버전과 원격 버전 둘 다 쓸 수 있게 함.
 - [2026-08-18T23:36:40.940Z] fresh-season의 실제 GitHub 소스(app/api/mcp/route.js)를 직접 확인해서 claude.ai 커스텀 커넥터 연결 방식을 정확히 맞춤: 헤더 인증 대신 ?key= URL 쿼리파라미터, 환경변수명도 MCP_SHARED_SECRET으로 통일(값: ufinder_admin_2026). claude.ai 커넥터는 헤더 입력칸이 없고, 완전 무인증이면 OAuth DCR 강제시도로 연결 자체가 실패하는 게 fresh-season 소스 주석에 명시되어 있었음. app/api/mcp.js 수정 완료, .mcp.json의 superfinder-remote도 새 URL로 갱신.
+- [2026-08-18T23:43:15.869Z] claude.ai 커넥터로 슈퍼파인더-Mcp 연결 성공 확인(mcp__175018da-...). 프레시시즌 소스 대조해서 list_github_files/get_github_file 도구를 로컬+원격 MCP 둘 다에 추가(GITHUB_REPO=minsiljang0/U-finder), 원격에는 get_plan도 GitHub Contents API로 PLAN.md를 직접 읽어오도록 추가. curl로 실제 호출까지 검증 완료. 프레시시즌의 나머지 도구(capture_screenshot, upload_image, naver_keyword_volume/news_search, publish_thread_post 등)는 레시피/블로그/네이버/Threads 도메인 전용이라 슈퍼파인더(유튜브 채널 발굴 도구)엔 해당 없어 의도적으로 이식 안 함.
