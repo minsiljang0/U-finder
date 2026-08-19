@@ -208,7 +208,7 @@ export default function GoldenFinder() {
       {searched && !loading && !error && (
         <div className="mb-5 rounded-xl bg-indigo-50 border border-blue-100 px-4 py-3 flex items-center gap-2 text-sm text-indigo-700">
           <RefreshCw className="w-4 h-4" />
-          매일 자정 00시(KST)에 새로운 채널로 자동 업데이트됩니다 — 이 클론은 버튼을 누를 때마다 실시간으로 다시 검색합니다.
+          매일 자정 00시(KST)에 새로운 채널로 자동 업데이트됩니다 — 카테고리를 누를 때마다 실시간으로 다시 검색합니다.
         </div>
       )}
 

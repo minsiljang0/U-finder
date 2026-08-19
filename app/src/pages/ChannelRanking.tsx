@@ -185,7 +185,7 @@ export default function ChannelRanking() {
               <StatBox label="30일 조회수(근사)" value={`${formatCount(detail.monthlyViews)}`} />
             </div>
             <p className="text-xs text-slate-400 mb-5">
-              * 이 클론은 자체 시계열 DB가 없어 최근 영상 조회수를 기반으로 근사 계산합니다. 실제 채널 통계와 다를 수 있습니다.
+              * 최근 영상 조회수를 기반으로 산출한 근사치입니다. 실제 채널 통계와 다를 수 있습니다.
             </p>
             <a
               href={`https://www.youtube.com/channel/${detail.id}`}

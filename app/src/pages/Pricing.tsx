@@ -24,9 +24,6 @@ export default function Pricing() {
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-slate-900 mb-2">요금제 안내</h2>
         <p className="text-slate-500 text-sm">3일 무료 체험 후, 프리미엄으로 모든 기능을 무제한 이용하세요.</p>
-        <p className="text-xs text-amber-600 mt-2">
-          * 이 클론은 실제 결제 연동이 없는 개인용 데모입니다. 버튼을 눌러도 로컬 상태만 바뀝니다.
-        </p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-5 mb-8">

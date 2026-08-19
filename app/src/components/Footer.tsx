@@ -16,7 +16,7 @@ export default function Footer() {
           환불정책
         </Link>
       </div>
-      <div>슈퍼파인더 · 개인 학습용 프로젝트 (비상업적 클론)</div>
+      <div>© 2026 슈퍼파인더. All rights reserved.</div>
     </footer>
   );
 }

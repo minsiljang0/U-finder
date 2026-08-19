@@ -118,9 +118,6 @@ export default function Subscription() {
       <div className="bg-white rounded-2xl p-6">
         <h2 className="font-bold text-slate-900 mb-3">결제 이력</h2>
         <p className="text-sm text-slate-400">결제 이력이 없습니다.</p>
-        <p className="text-xs text-slate-300 mt-3">
-          * 이 클론은 개인 학습용이라 실제 결제(Toss Payments 등) 연동 없이 로컬 데모로만 동작합니다.
-        </p>
       </div>
     </div>
   );
