@@ -174,6 +174,30 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 
 **아직 안 한 것**: 이 2개 도구는 로컬(`mcp/index.mjs`)+원격(`app/api/mcp.js`) MCP엔 반영됐지만, React UI(`app/src/pages/`)에는 아직 대응 화면이 없다 — "황금 채널 발굴기" 페이지에 "채널 URL로 검색" 모드를 추가하거나 새 탭을 만드는 건 후속 작업으로 남겨둠. Vercel 환경변수는 기존 `SUPABASE_SECRET_KEY`를 그대로 재사용하므로 추가 설정 불필요.
 
+### ① 플랫폼 확장 — Apify 조사 및 테스트 (2026-08-29)
+
+**결정 배경**: Instagram/TikTok/샤오홍슈/도우인은 YouTube Data API 같은 무료 공식 검색 API가 없음(Instagram Graph API는 본인 소유 비즈니스 계정만 조회 가능, 타 플랫폼은 공식 검색 API 자체가 없음) → 유료 스크래핑 서비스 Apify 사용으로 결정, 사용자가 apify.com 계정(`mintimjang33`, Personal, 월 $5 무료 크레딧) 직접 가입 완료.
+
+**후보 액터 조사 결과** (apify.com Store 실제 조회, 별점·사용자수 확인):
+- Instagram: `apidojo/instagram-scraper`($1.50/1천건, 4.7★/580명/38만명 사용) 또는 전용 액터(Post/Reel $1.00, Profile $1.60, Hashtag $1.90 각 1천건당)
+- TikTok: `clockworks/tiktok-scraper`($1.70/1천건, 4.8★/364명/24.6만명 사용, apify.com Store에서 확인됨) 또는 `apidojo/tiktok-scraper`(더 저렴, $0.30/1천건, 성공률 98%)
+- 샤오홍슈: `zhorex/rednote-xiaohongshu-scraper`(키워드검색+계정별포스트+댓글+트렌딩 통합) 또는 `atomus/xiaohongshu-scraper`(로그인·쿠키 불필요)
+- 도우인: `natanielsantos/douyin-scraper`(영상) + `douyin-comments-scraper`(댓글, 별도 액터)
+
+**실제 API 테스트 (2026-08-29, apify.com API 직접 호출)**:
+- `apidojo/instagram-scraper`: `startUrls: ["instagram.com/taylorswift/"], maxItems: 5` → 5건 정상 수집(게시물 URL·좋아요수·댓글수·캡션 등 포함)
+- `clockworks/tiktok-scraper`: `hashtags: ["요리"], resultsPerPage: 5` → 5건 정상 수집
+- **버그 발견**: 한글 해시태그를 curl `-d`(inline 문자열)로 보내면 인코딩이 깨져서(`丮` 등 깨진 문자) `NOT_FOUND` 에러남. UTF-8로 저장한 JSON 파일을 `--data-binary @file`로 보내면 정상 동작 — 실제 통합 시(Node fetch는 문자열을 자동으로 올바르게 UTF-8 인코딩하므로 이 문제는 curl 테스트에서만 발생하고 실제 코드 구현에선 재현 안 될 가능성 높음, 그래도 유의)
+- 테스트 비용: 두 액터 합쳐 **$0.012**(무료 크레딧 $5 중), 이 페이스면 실사용에서도 여유 있음
+
+**현재 상태**: **API 토큰은 프로젝트에 등록(영구 저장)되지 않음.** 사용자가 채팅으로 전달한 토큰으로 1회성 curl 테스트만 진행했고, `app/.env`/Vercel 환경변수/`.mcp.json` 어디에도 반영 안 함 — 임시 검증 단계일 뿐, 실제 MCP 도구(`search_instagram`/`search_tiktok` 등) 구현 전.
+
+**다음 단계** (사용자 최종 결정 시 진행):
+1. `APIFY_API_TOKEN`을 `mcp/index.mjs`(로컬, `.mcp.json` env) + `app/api/mcp.js`(원격, Vercel 환경변수)에 등록
+2. `mcp/instagram.mjs`/`mcp/tiktok.mjs` 등 신규 클라이언트 모듈 작성(`youtube.mjs` 패턴과 동일하게 로컬+원격 공유)
+3. `search_instagram`/`search_by_tiktok_hashtag` 등 신규 MCP 도구 등록(로컬+원격 양쪽)
+4. React UI 반영은 더 후순위
+
 ## 6. 진행 순서
 
 1. 프로젝트 스캐폴딩 (Vite+React+TS+Tailwind+Router)
@@ -203,3 +227,4 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 - [2026-08-18T23:36:40.940Z] fresh-season의 실제 GitHub 소스(app/api/mcp/route.js)를 직접 확인해서 claude.ai 커스텀 커넥터 연결 방식을 정확히 맞춤: 헤더 인증 대신 ?key= URL 쿼리파라미터, 환경변수명도 MCP_SHARED_SECRET으로 통일(값: ufinder_admin_2026). claude.ai 커넥터는 헤더 입력칸이 없고, 완전 무인증이면 OAuth DCR 강제시도로 연결 자체가 실패하는 게 fresh-season 소스 주석에 명시되어 있었음. app/api/mcp.js 수정 완료, .mcp.json의 superfinder-remote도 새 URL로 갱신.
 - [2026-08-18T23:43:15.869Z] claude.ai 커넥터로 슈퍼파인더-Mcp 연결 성공 확인(mcp__175018da-...). 프레시시즌 소스 대조해서 list_github_files/get_github_file 도구를 로컬+원격 MCP 둘 다에 추가(GITHUB_REPO=minsiljang0/U-finder), 원격에는 get_plan도 GitHub Contents API로 PLAN.md를 직접 읽어오도록 추가. curl로 실제 호출까지 검증 완료. 프레시시즌의 나머지 도구(capture_screenshot, upload_image, naver_keyword_volume/news_search, publish_thread_post 등)는 레시피/블로그/네이버/Threads 도메인 전용이라 슈퍼파인더(유튜브 채널 발굴 도구)엔 해당 없어 의도적으로 이식 안 함.
 - [2026-08-29] 로컬 작업폴더(app/mcp)의 tracked 파일 62개가 커밋 안 된 상태로 디스크에서 사라져 있던 걸 발견 — origin/main과는 동기화 상태라 GitHub에서 새로 클론해 복구(git restore가 권한상 막혀 우회). Qventor 비교 조사로 발견한 격차 중 ②특정 채널 지정 수집(`search_by_channel`)과 ③썸네일 다운로드·저장(`download_thumbnails`, Supabase Storage `finder-media` 버킷)을 로컬+원격 MCP 양쪽에 구현하고 실제 API로 검증 완료(§11 참고). ①플랫폼 확장(멀티플랫폼)은 유료 데이터 제공업체 결정이 먼저 필요해 보류. React UI 반영은 후속 작업.
+- [2026-08-29] ①플랫폼 확장 후속: 사용자가 Apify 계정 가입 완료(mintimjang33). Instagram(apidojo/instagram-scraper)·TikTok(clockworks/tiktok-scraper) 액터를 실제 API로 테스트 — 둘 다 5건씩 정상 수집, 비용 $0.012(무료크레딧 $5 중). 한글 해시태그 curl 인코딩 버그 발견(파일 기반 payload로 우회 확인). **주의: API 토큰은 아직 프로젝트에 등록 안 함** — 1회성 테스트만 했고 .env/Vercel 환경변수엔 미반영, 실제 MCP 도구 구현은 착수 전(§11 "다음 단계" 참고).
