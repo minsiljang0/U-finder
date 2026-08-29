@@ -160,6 +160,20 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
   로컬 stdio MCP(`superfinder`)와 달리 이건 배포만 되면 **어느 기기·클라이언트에서든** 같은 Supabase 데이터에 접속 가능 — `.mcp.json`에도 `superfinder-remote`로 등록해둠.
 - **브랜딩**: "황금" → "슈퍼"로 전체 변경, 컬러 테마를 원본의 amber/blue 계열에서 violet/indigo 계열로 전면 교체(느낌 다르게 해달라는 요청), "듀오랩스" 등 원본 회사명은 "비즈니스 지원센터"로 대체.
 
+## 11. 신규 기능 추가 (Qventor 비교 조사 기반, 2026-08-29)
+
+경쟁 프로그램 "Qventor"(AI 영상 자동화 툴)의 분석 단계 UI를 실제로 스캔해서 슈퍼파인더와 기능을 대조한 결과, 3가지 격차를 확인하고 그중 2가지를 구현했다.
+
+| # | 기능 | 상태 | 비고 |
+|---|---|---|---|
+| ① | 플랫폼 확장 (YouTube만 → Instagram/TikTok/Xiaohongshu/Douyin/Bilibili) | **보류** | YouTube Data API 같은 공식 무료 검색 API가 이 플랫폼들엔 없음. Instagram은 Meta Graph API(비즈니스 계정 전용, 공개 검색 불가), TikTok/Xiaohongshu/Douyin은 비공식 스크래핑만 가능 — ToS/탐지회피 리스크가 있어 임의로 구현하지 않음. **진행하려면 유료 데이터 제공업체(Apify, RapidAPI 등) 선택과 예산 결정이 먼저 필요.** |
+| ② | 특정 채널 지정 수집 (프로필 모드) | ✅ 완료 | 신규 함수 `resolveChannelId`/`getChannelVideos`(youtube.mjs, _youtube.js), 신규 MCP 도구 `search_by_channel`(channelInput: URL/@핸들/채널ID, maxResults, order). 실제 API로 `@mkbhd` 채널 해석 + 영상 조회 검증 완료. |
+| ③ | 검색결과 미디어 다운로드·저장 | ✅ 완료(범위 축소) | **썸네일 이미지만** 캐싱(실제 영상 파일 다운로드는 유튜브 ToS상 그레이존이라 제외). 신규 `mcp/storage.mjs`/`app/api/_storage.js`(Supabase Storage REST, 버킷 `finder-media` 자동 생성), 신규 MCP 도구 `download_thumbnails`(videoIds 최대 20개 → 공개 URL 배열). 실제 업로드+공개접근 검증 완료. |
+
+**버그 노트**: Storage 버킷 존재 확인 시 Supabase가 버킷없음을 HTTP 404가 아니라 400(+본문 `code: "NoSuchBucket"`)으로 응답한다 — `check.status === 404` 조건으로 짜면 버킷 생성이 항상 스킵되고 업로드가 실패한다. `!check.ok`로 체크하도록 수정.
+
+**아직 안 한 것**: 이 2개 도구는 로컬(`mcp/index.mjs`)+원격(`app/api/mcp.js`) MCP엔 반영됐지만, React UI(`app/src/pages/`)에는 아직 대응 화면이 없다 — "황금 채널 발굴기" 페이지에 "채널 URL로 검색" 모드를 추가하거나 새 탭을 만드는 건 후속 작업으로 남겨둠. Vercel 환경변수는 기존 `SUPABASE_SECRET_KEY`를 그대로 재사용하므로 추가 설정 불필요.
+
 ## 6. 진행 순서
 
 1. 프로젝트 스캐폴딩 (Vite+React+TS+Tailwind+Router)
@@ -188,3 +202,4 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 - [2026-08-18T22:40:04.113Z] Vercel 배포 확인 완료: 프론트엔드(Supabase URL 정상 baked-in), 원격 MCP 엔드포인트(/api/mcp, 실제 tools/call로 Supabase known_issues 조회까지 curl로 검증 완료), 관리자 페이지(minsiljang0@gmail.com 전용, 가입 회원 목록 조회) 전부 정상 동작 확인. .mcp.json에 superfinder-remote(http) 항목 추가해서 로컬 stdio 버전과 원격 버전 둘 다 쓸 수 있게 함.
 - [2026-08-18T23:36:40.940Z] fresh-season의 실제 GitHub 소스(app/api/mcp/route.js)를 직접 확인해서 claude.ai 커스텀 커넥터 연결 방식을 정확히 맞춤: 헤더 인증 대신 ?key= URL 쿼리파라미터, 환경변수명도 MCP_SHARED_SECRET으로 통일(값: ufinder_admin_2026). claude.ai 커넥터는 헤더 입력칸이 없고, 완전 무인증이면 OAuth DCR 강제시도로 연결 자체가 실패하는 게 fresh-season 소스 주석에 명시되어 있었음. app/api/mcp.js 수정 완료, .mcp.json의 superfinder-remote도 새 URL로 갱신.
 - [2026-08-18T23:43:15.869Z] claude.ai 커넥터로 슈퍼파인더-Mcp 연결 성공 확인(mcp__175018da-...). 프레시시즌 소스 대조해서 list_github_files/get_github_file 도구를 로컬+원격 MCP 둘 다에 추가(GITHUB_REPO=minsiljang0/U-finder), 원격에는 get_plan도 GitHub Contents API로 PLAN.md를 직접 읽어오도록 추가. curl로 실제 호출까지 검증 완료. 프레시시즌의 나머지 도구(capture_screenshot, upload_image, naver_keyword_volume/news_search, publish_thread_post 등)는 레시피/블로그/네이버/Threads 도메인 전용이라 슈퍼파인더(유튜브 채널 발굴 도구)엔 해당 없어 의도적으로 이식 안 함.
+- [2026-08-29] 로컬 작업폴더(app/mcp)의 tracked 파일 62개가 커밋 안 된 상태로 디스크에서 사라져 있던 걸 발견 — origin/main과는 동기화 상태라 GitHub에서 새로 클론해 복구(git restore가 권한상 막혀 우회). Qventor 비교 조사로 발견한 격차 중 ②특정 채널 지정 수집(`search_by_channel`)과 ③썸네일 다운로드·저장(`download_thumbnails`, Supabase Storage `finder-media` 버킷)을 로컬+원격 MCP 양쪽에 구현하고 실제 API로 검증 완료(§11 참고). ①플랫폼 확장(멀티플랫폼)은 유료 데이터 제공업체 결정이 먼저 필요해 보류. React UI 반영은 후속 작업.

@@ -17,7 +17,10 @@ import {
   fmt,
   categoryQueries,
   CATEGORY_LIST,
+  resolveChannelId,
+  getChannelVideos,
 } from "./_youtube.js";
+import { saveThumbnail } from "./_storage.js";
 
 const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
 const GITHUB_REPO = "minsiljang0/U-finder";
@@ -365,6 +368,72 @@ function buildServer() {
           .slice(0, limit);
 
         const lines = ranked.map((r, idx) => `#${idx + 1} ${r.ch.snippet.title} | 구독자 ${fmt(r.ch.statistics.subscriberCount)}명 | 일 조회수(근사) ${fmt(r.dailyViews)}`);
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_by_channel",
+    {
+      title: "특정 채널 지정 수집",
+      description: "채널 URL(youtube.com/@handle, /channel/UC..., /c/..., /user/...)이나 채널ID, @핸들로 그 채널의 영상만 모아서 가져온다.",
+      inputSchema: {
+        channelInput: z.string(),
+        maxResults: z.number().default(20),
+        order: z.enum(["date", "viewCount"]).default("date"),
+      },
+    },
+    async ({ channelInput, maxResults, order }) => {
+      try {
+        const channelId = await resolveChannelId(channelInput);
+        const items = await getChannelVideos({ channelId, maxResults, order });
+        const ids = items.map((it) => it.id.videoId).filter(Boolean);
+        const videos = await getVideosById(ids);
+        const [channel] = await getChannelsById([channelId]);
+        const lines = videos.map((v) => {
+          const views = Number(v.statistics.viewCount ?? 0);
+          const days = Math.max(1, daysSince(v.snippet.publishedAt));
+          return `- "${v.snippet.title}" | 조회수 ${fmt(views)} | ${Math.floor(days)}일 전 | https://youtube.com/watch?v=${v.id}`;
+        });
+        const header = channel
+          ? `${channel.snippet.title} (구독자 ${fmt(channel.statistics.subscriberCount)}명), 영상 ${videos.length}개:`
+          : `영상 ${videos.length}개:`;
+        return { content: [{ type: "text", text: `${header}\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "download_thumbnails",
+    {
+      title: "썸네일 이미지 다운로드·저장",
+      description:
+        "영상 ID 목록(최대 20개)으로 유튜브 썸네일 이미지를 가져와 Supabase Storage(finder-media 버킷)에 저장하고 공개 URL을 반환한다. " +
+        "실제 영상 파일이 아니라 공개 썸네일 이미지만 캐싱한다.",
+      inputSchema: { videoIds: z.array(z.string()).min(1).max(20) },
+    },
+    async ({ videoIds }) => {
+      try {
+        const videos = await getVideosById(videoIds);
+        const lines = [];
+        for (const v of videos) {
+          const thumbUrl = thumbOf(v.snippet);
+          if (!thumbUrl) {
+            lines.push(`- ${v.id}: 썸네일 없음`);
+            continue;
+          }
+          try {
+            const savedUrl = await saveThumbnail(v.id, thumbUrl);
+            lines.push(`- ${v.id} "${v.snippet.title}" → ${savedUrl}`);
+          } catch (e) {
+            lines.push(`- ${v.id}: 저장 실패 (${e.message})`);
+          }
+        }
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (e) {
         return { content: [{ type: "text", text: e.message }], isError: true };

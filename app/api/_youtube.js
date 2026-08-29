@@ -76,6 +76,36 @@ export async function getChannelsById(ids) {
   return out;
 }
 
+export async function resolveChannelId(input) {
+  const raw = input.trim();
+  if (/^UC[\w-]{22}$/.test(raw)) return raw;
+
+  let handle = raw;
+  const urlMatch = raw.match(/youtube\.com\/(?:channel\/(UC[\w-]{22})|@([\w.-]+)|c\/([\w.-]+)|user\/([\w.-]+))/i);
+  if (urlMatch) {
+    if (urlMatch[1]) return urlMatch[1];
+    handle = urlMatch[2] || urlMatch[3] || urlMatch[4];
+  }
+  handle = handle.replace(/^@/, "");
+
+  const byHandle = await apiGet("channels", { part: "id", forHandle: `@${handle}` });
+  if (byHandle.items?.[0]?.id) return byHandle.items[0].id;
+
+  const byUsername = await apiGet("channels", { part: "id", forUsername: handle });
+  if (byUsername.items?.[0]?.id) return byUsername.items[0].id;
+
+  const bySearch = await apiGet("search", { part: "snippet", type: "channel", q: raw, maxResults: 1 });
+  const chId = bySearch.items?.[0]?.snippet?.channelId ?? bySearch.items?.[0]?.id?.channelId;
+  if (chId) return chId;
+
+  throw new Error(`채널을 찾을 수 없습니다: ${raw}`);
+}
+
+export async function getChannelVideos({ channelId, maxResults = 20, order = "date" }) {
+  const data = await apiGet("search", { part: "snippet", type: "video", channelId, order, maxResults });
+  return (data.items || []).filter((it) => it.id.videoId);
+}
+
 export async function getMostPopular({ maxResults = 50 } = {}) {
   const data = await apiGet("videos", { part: "snippet,statistics,contentDetails", chart: "mostPopular", regionCode: "KR", maxResults });
   return data.items || [];
