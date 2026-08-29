@@ -1,15 +1,28 @@
 // Apify 기반 멀티플랫폼(Instagram/TikTok/샤오홍슈/도우인) 검색 클라이언트.
 // YouTube(youtube.mjs)와 달리 공식 무료 API가 없는 플랫폼이라 Apify 유료 액터를 통해 조회한다.
+// 토큰은 Vercel 환경변수 등록(원격은 사용자가 직접 해야 함) 없이 쓸 수 있도록, 이미 접근권한이 있는
+// Supabase app_config 테이블(key=apify_api_token)에서 읽는다 — env var는 로컬 임시 override용으로만 유지.
 const APIFY_BASE = "https://api.apify.com/v2";
+const SUPABASE_URL = process.env.SUPABASE_URL ?? "https://pyplpivswdbrjytfqclm.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY;
 
-function apifyToken() {
-  const key = process.env.APIFY_API_TOKEN;
-  if (!key) throw new Error("APIFY_API_TOKEN 환경변수가 설정되어 있지 않습니다.");
-  return key;
+let cachedApifyToken;
+async function apifyToken() {
+  if (process.env.APIFY_API_TOKEN) return process.env.APIFY_API_TOKEN;
+  if (cachedApifyToken) return cachedApifyToken;
+  if (!SUPABASE_KEY) throw new Error("APIFY_API_TOKEN 환경변수도 없고 SUPABASE_SECRET_KEY도 없어 토큰을 가져올 수 없습니다.");
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_config?key=eq.apify_api_token&select=value`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase app_config 조회 실패 (${res.status})`);
+  const rows = await res.json();
+  if (!rows[0]?.value) throw new Error("Supabase app_config에 apify_api_token 값이 없습니다. upsert_row(app_config, {key:'apify_api_token', value:'...'})로 등록하세요.");
+  cachedApifyToken = rows[0].value;
+  return cachedApifyToken;
 }
 
 async function runActor(actorId, input, { timeoutSecs = 120 } = {}) {
-  const url = `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken()}&timeout=${timeoutSecs}`;
+  const url = `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items?token=${await apifyToken()}&timeout=${timeoutSecs}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },

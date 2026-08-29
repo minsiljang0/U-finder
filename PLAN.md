@@ -211,7 +211,16 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 
 **크롬 확장/브라우저 직접접근 대안 검토(2026-08-29)**: 사용자 제안으로 로그인 없는 자동화 브라우저로 TikTok/Instagram 접근을 실제 테스트함 — TikTok은 해시태그 페이지 접속 즉시 "문제가 발생했습니다"로 차단, Instagram은 로그인 페이지로 강제 리다이렉트되어 콘텐츠 자체가 안 보임(유튜브 자막 가져오기와 동일한 PO토큰/봇감지 패턴). 크롬 확장으로 만들려면 사용자 본인의 실제 로그인 세션이 필요하고, 그래도 자동화 패턴 탐지로 계정 제한 위험이 있음 — Apify가 이미 안티디텍션을 전담 유지보수하는 걸 감안하면 지금 단계에선 Apify가 더 실용적. 크레딧이 실제 부담될 때 재검토 후보로 남겨둠.
 
-**아직 안 한 것**: React UI(`app/src/pages/`) 반영은 후속 작업. Vercel 원격 MCP(`app/api/mcp.js`)에서 쓰려면 Vercel 프로젝트 환경변수에 `APIFY_API_TOKEN` 추가 필요(로컬 `.mcp.json`엔 등록 완료, Vercel은 대시보드에서 사용자가 직접 등록해야 함 — Claude는 Vercel 계정에 접근 권한 없음).
+**아직 안 한 것**: React UI(`app/src/pages/`) 반영은 후속 작업.
+
+### 토큰 저장 방식 변경: Vercel 환경변수 → Supabase app_config (2026-08-29)
+
+처음엔 `APIFY_API_TOKEN`을 로컬 `.mcp.json` env + Vercel 프로젝트 환경변수 두 곳에 등록하는 방식으로 시작했으나, 사용자가 "Vercel에 등록하면 다른 MCP(프로젝트)에서 못 쓰지 않냐"고 지적 → 맞는 지적이라 방식을 바꿈:
+
+- Vercel 환경변수는 **프로젝트별로 완전히 격리**되어 다른 배포(슈퍼쇼츠/원샷/유쓰레드 등)에서 공유 불가. 로컬 `.mcp.json`도 서버 항목(`superfinder`)별로 `env`가 분리되어 마찬가지.
+- **해결책**: 이미 `app_config` 테이블이 있는 파인더 전용 Supabase(`u-finder`)에 `key=apify_api_token`으로 저장(upsert 완료). `mcp/apify.mjs`/`app/api/_apify.js`의 `apifyToken()`이 `process.env.APIFY_API_TOKEN`(로컬 임시 override용, 지금은 미설정) → 없으면 Supabase `app_config` 조회 순으로 토큰을 가져오도록 수정. 원격(Vercel)은 이미 `SUPABASE_SECRET_KEY`를 갖고 있으므로 **Vercel에 새 환경변수를 추가할 필요가 완전히 없어짐** — env var로 실제 Apify 호출 성공까지 검증 완료(에러는 무관한 월 한도초과 이슈뿐).
+- `.mcp.json`의 `APIFY_API_TOKEN`은 중복이라 제거(Supabase가 단일 소스).
+- **한계**: 이 방식은 파인더 전용 Supabase(`u-finder`)에만 저장된 것이라, 슈퍼쇼츠(→유쇼츠로 리네이밍 예정)나 원샷처럼 **다른 Supabase 프로젝트를 쓰는 곳**에선 여전히 자기 프로젝트의 app_config(또는 동등한 테이블)에 따로 등록해야 함 — 진짜 여러 프로젝트가 하나의 키를 공유하려면 별도의 중앙 시크릿 스토어가 필요하지만 지금 규모에선 과함.
 
 ## 6. 진행 순서
 
