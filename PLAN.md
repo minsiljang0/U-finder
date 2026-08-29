@@ -192,11 +192,26 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 
 **현재 상태**: **API 토큰은 프로젝트에 등록(영구 저장)되지 않음.** 사용자가 채팅으로 전달한 토큰으로 1회성 curl 테스트만 진행했고, `app/.env`/Vercel 환경변수/`.mcp.json` 어디에도 반영 안 함 — 임시 검증 단계일 뿐, 실제 MCP 도구(`search_instagram`/`search_tiktok` 등) 구현 전.
 
-**다음 단계** (사용자 최종 결정 시 진행):
-1. `APIFY_API_TOKEN`을 `mcp/index.mjs`(로컬, `.mcp.json` env) + `app/api/mcp.js`(원격, Vercel 환경변수)에 등록
-2. `mcp/instagram.mjs`/`mcp/tiktok.mjs` 등 신규 클라이언트 모듈 작성(`youtube.mjs` 패턴과 동일하게 로컬+원격 공유)
-3. `search_instagram`/`search_by_tiktok_hashtag` 등 신규 MCP 도구 등록(로컬+원격 양쪽)
-4. React UI 반영은 더 후순위
+### ① 구현 완료 (2026-08-29)
+
+사용자 지시("다른 것도 다 추가해놓고")에 따라 4개 플랫폼 전부 구현 완료. `mcp/apify.mjs`/`app/api/_apify.js`(신규, youtube.mjs와 동일한 로컬+원격 공유 패턴) + 6개 MCP 도구를 로컬(`mcp/index.mjs`)·원격(`app/api/mcp.js`) 양쪽에 등록:
+
+| 도구 | 플랫폼 | 상태 |
+|---|---|---|
+| `search_instagram` | Instagram | ✅ 완료(해시태그+계정 둘 다), 실API 검증 |
+| `search_tiktok` | TikTok | ✅ 완료(해시태그), 실API 검증 |
+| `get_xiaohongshu_posts` | 샤오홍슈 | ✅ 완료(계정 지정, 로그인 불필요), 실API 검증 |
+| `search_xiaohongshu` | 샤오홍슈 | ⚠️ 베타 — 로그인 세션(cookieString) 필수, 미제공시 API 호출 전에 에러로 안내(과금 방지) |
+| `get_douyin_posts` | 도우인 | ✅ 완료(계정 지정), 실API 검증(단, 테스트 땐 임의 URL이라 0건 반환 — 코드 경로 자체는 로그로 정상 확인) |
+| `search_douyin` | 도우인 | ⚠️ 준비중 — 액터 개발자가 Apify 무료(비결제) 사용자에게 검색 기능을 원천 차단(`ERROR: Search scraping was disabled to non-paying users`, 실제 로그로 확인). 유료 플랜 업그레이드 전까진 호출해도 항상 이 에러가 남 |
+
+**버그 수정**: 샤오홍슈 액터의 계정조회 결과개수 제한 파라미터는 `maxItems`가 아니라 `maxResults`(액터 스키마로 직접 확인) — 처음엔 2건 요청했는데 16건이 오는 걸 발견해서 수정.
+
+**⚠️ Apify 크레딧 소진**: 이번 조사+테스트로 월 무료 크레딧 $5를 **$5.144까지 초과 소모**함(개별 호출은 몇 센트씩이었지만 누적으로 초과). 결제수단은 등록 안 되어 있어(FREE 플랜, `isPaying: false`) 자동 청구는 안 됐지만, **이번 달 남은 기간엔 Apify 액터 호출이 막힐 수 있음**(무료 한도 초과시 추가 실행 차단). 다음 달 크레딧 리셋을 기다리거나, 유료 플랜(Starter 등) 업그레이드가 필요.
+
+**크롬 확장/브라우저 직접접근 대안 검토(2026-08-29)**: 사용자 제안으로 로그인 없는 자동화 브라우저로 TikTok/Instagram 접근을 실제 테스트함 — TikTok은 해시태그 페이지 접속 즉시 "문제가 발생했습니다"로 차단, Instagram은 로그인 페이지로 강제 리다이렉트되어 콘텐츠 자체가 안 보임(유튜브 자막 가져오기와 동일한 PO토큰/봇감지 패턴). 크롬 확장으로 만들려면 사용자 본인의 실제 로그인 세션이 필요하고, 그래도 자동화 패턴 탐지로 계정 제한 위험이 있음 — Apify가 이미 안티디텍션을 전담 유지보수하는 걸 감안하면 지금 단계에선 Apify가 더 실용적. 크레딧이 실제 부담될 때 재검토 후보로 남겨둠.
+
+**아직 안 한 것**: React UI(`app/src/pages/`) 반영은 후속 작업. Vercel 원격 MCP(`app/api/mcp.js`)에서 쓰려면 Vercel 프로젝트 환경변수에 `APIFY_API_TOKEN` 추가 필요(로컬 `.mcp.json`엔 등록 완료, Vercel은 대시보드에서 사용자가 직접 등록해야 함 — Claude는 Vercel 계정에 접근 권한 없음).
 
 ## 6. 진행 순서
 
@@ -228,3 +243,4 @@ claude.ai Settings → Connectors → 커스텀 커넥터로 `https://u-finder-a
 - [2026-08-18T23:43:15.869Z] claude.ai 커넥터로 슈퍼파인더-Mcp 연결 성공 확인(mcp__175018da-...). 프레시시즌 소스 대조해서 list_github_files/get_github_file 도구를 로컬+원격 MCP 둘 다에 추가(GITHUB_REPO=minsiljang0/U-finder), 원격에는 get_plan도 GitHub Contents API로 PLAN.md를 직접 읽어오도록 추가. curl로 실제 호출까지 검증 완료. 프레시시즌의 나머지 도구(capture_screenshot, upload_image, naver_keyword_volume/news_search, publish_thread_post 등)는 레시피/블로그/네이버/Threads 도메인 전용이라 슈퍼파인더(유튜브 채널 발굴 도구)엔 해당 없어 의도적으로 이식 안 함.
 - [2026-08-29] 로컬 작업폴더(app/mcp)의 tracked 파일 62개가 커밋 안 된 상태로 디스크에서 사라져 있던 걸 발견 — origin/main과는 동기화 상태라 GitHub에서 새로 클론해 복구(git restore가 권한상 막혀 우회). Qventor 비교 조사로 발견한 격차 중 ②특정 채널 지정 수집(`search_by_channel`)과 ③썸네일 다운로드·저장(`download_thumbnails`, Supabase Storage `finder-media` 버킷)을 로컬+원격 MCP 양쪽에 구현하고 실제 API로 검증 완료(§11 참고). ①플랫폼 확장(멀티플랫폼)은 유료 데이터 제공업체 결정이 먼저 필요해 보류. React UI 반영은 후속 작업.
 - [2026-08-29] ①플랫폼 확장 후속: 사용자가 Apify 계정 가입 완료(mintimjang33). Instagram(apidojo/instagram-scraper)·TikTok(clockworks/tiktok-scraper) 액터를 실제 API로 테스트 — 둘 다 5건씩 정상 수집, 비용 $0.012(무료크레딧 $5 중). 한글 해시태그 curl 인코딩 버그 발견(파일 기반 payload로 우회 확인). **주의: API 토큰은 아직 프로젝트에 등록 안 함** — 1회성 테스트만 했고 .env/Vercel 환경변수엔 미반영, 실제 MCP 도구 구현은 착수 전(§11 "다음 단계" 참고).
+- [2026-08-29] ①플랫폼 확장 완료: 사용자 지시로 4개 플랫폼(Instagram/TikTok/샤오홍슈/도우인) 전부 구현. `mcp/apify.mjs`+`app/api/_apify.js` 신규 작성, MCP 도구 6개(search_instagram/search_tiktok/get_xiaohongshu_posts/search_xiaohongshu/get_douyin_posts/search_douyin) 로컬+원격 양쪽 등록. `.mcp.json`에 APIFY_API_TOKEN 등록 완료(로컬), Vercel 환경변수는 사용자가 직접 등록 필요. 샤오홍슈 계정조회 maxItems 무시 버그 발견해 maxResults로 수정. **Apify 무료크레딧($5) 테스트 중 초과 소모(→$5.144)** — 결제수단 미등록이라 자동청구는 없지만 이번 달 추가 호출 막힐 수 있음. 사용자 제안으로 로그인없는 크롬 자동화 접근도 실측 테스트(TikTok/Instagram 둘 다 즉시 차단/로그인요구 확인) — 크롬 확장 대안은 계정 위험 때문에 지금은 보류, Apify 유지가 낫다고 판단.

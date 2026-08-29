@@ -21,6 +21,14 @@ import {
   getChannelVideos,
 } from "./_youtube.js";
 import { saveThumbnail } from "./_storage.js";
+import {
+  searchInstagram,
+  searchTiktok,
+  getXiaohongshuPosts,
+  searchXiaohongshu,
+  getDouyinPosts,
+  searchDouyin,
+} from "./_apify.js";
 
 const TABLES = ["app_config", "dev_notes", "known_issues", "tasks"];
 const GITHUB_REPO = "minsiljang0/U-finder";
@@ -435,6 +443,120 @@ function buildServer() {
           }
         }
         return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  // ── 멀티플랫폼(Instagram/TikTok/샤오홍슈/도우인) 검색 도구. Apify 유료 액터 사용, APIFY_API_TOKEN 필요. ──
+
+  server.registerTool(
+    "search_instagram",
+    {
+      title: "Instagram 검색 (해시태그/계정)",
+      description: "query(해시태그)나 profileUrl(계정 URL) 중 하나로 Instagram 게시물을 가져온다. Apify 액터 apidojo/instagram-scraper 사용, 건당 과금.",
+      inputSchema: { query: z.string().optional(), profileUrl: z.string().optional(), maxItems: z.number().default(10) },
+    },
+    async ({ query, profileUrl, maxItems }) => {
+      try {
+        const items = await searchInstagram({ query, profileUrl, maxItems });
+        const lines = items.map((it) => `- [${it.type ?? "post"}] "${(it.caption ?? "").slice(0, 60)}" | ❤️${it.likeCount ?? "?"} 💬${it.commentCount ?? "?"} | ${it.url ?? ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_tiktok",
+    {
+      title: "TikTok 검색 (해시태그)",
+      description: "query(해시태그/키워드)로 TikTok 영상을 가져온다. Apify 액터 clockworks/tiktok-scraper 사용, 건당 과금.",
+      inputSchema: { query: z.string(), maxItems: z.number().default(10) },
+    },
+    async ({ query, maxItems }) => {
+      try {
+        const items = await searchTiktok({ query, maxItems });
+        const lines = items.map((it) => `- "${(it.text ?? "").slice(0, 60)}" | ❤️${it.diggCount ?? "?"} ▶️${it.playCount ?? "?"} | @${it.authorMeta?.name ?? "?"} | ${it.webVideoUrl ?? ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_xiaohongshu_posts",
+    {
+      title: "샤오홍슈 계정 지정 조회",
+      description: "profileUrl(계정 URL)로 그 계정의 게시물을 가져온다. 로그인 불필요, 실제 검증 완료(2026-08-29). 키워드 검색은 search_xiaohongshu 참고(로그인 필요).",
+      inputSchema: { profileUrl: z.string(), maxItems: z.number().default(10) },
+    },
+    async ({ profileUrl, maxItems }) => {
+      try {
+        const items = await getXiaohongshuPosts({ profileUrl, maxItems });
+        const lines = items.map((it) => `- "${(it.title ?? "").slice(0, 60)}" | ❤️${it.likes ?? "?"} | ${it.postUrl || it.images?.[0] || ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_xiaohongshu",
+    {
+      title: "샤오홍슈 키워드 검색 (베타, 로그인 필요)",
+      description:
+        "query(검색어)로 샤오홍슈를 검색한다. ⚠️ 익명 요청은 실제 검색이 안 되고 추천피드만 반환되어(비용 청구 안 됨), cookieString(로그인 세션 쿠키)이 사실상 필수다. " +
+        "브라우저에서 xiaohongshu.com 로그인 후 개발자도구에서 쿠키를 복사해 전달할 것.",
+      inputSchema: { query: z.string(), cookieString: z.string().optional(), maxItems: z.number().default(10) },
+    },
+    async ({ query, cookieString, maxItems }) => {
+      try {
+        const items = await searchXiaohongshu({ query, cookieString, maxItems });
+        const lines = items.map((it) => `- "${(it.title ?? "").slice(0, 60)}" | ❤️${it.likes ?? "?"} | ${it.postUrl || ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_douyin_posts",
+    {
+      title: "도우인 계정 지정 조회",
+      description: "profileUrl(계정 URL)로 그 계정의 영상을 가져온다. 무료 티어에서 실제 검증 완료(2026-08-29). 키워드 검색은 search_douyin 참고(유료 플랜 필요).",
+      inputSchema: { profileUrl: z.string(), maxItems: z.number().default(10) },
+    },
+    async ({ profileUrl, maxItems }) => {
+      try {
+        const items = await getDouyinPosts({ profileUrl, maxItems });
+        const lines = items.map((it) => `- "${(it.text ?? it.title ?? "").slice(0, 60)}" | ❤️${it.diggCount ?? it.likes ?? "?"} | ${it.webVideoUrl ?? it.url ?? ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_douyin",
+    {
+      title: "도우인 키워드 검색 (유료 플랜 필요)",
+      description:
+        "query(검색어/해시태그)로 도우인을 검색한다. ⚠️ 액터 개발자가 Apify 무료(비결제) 사용자에게 검색 기능 자체를 막아놔서(실제 확인됨, 2026-08-29) " +
+        "Apify 유료 플랜으로 업그레이드해야 동작한다. 계정 지정 조회는 get_douyin_posts로 무료로 가능.",
+      inputSchema: { query: z.string(), maxItems: z.number().default(10) },
+    },
+    async ({ query, maxItems }) => {
+      try {
+        const items = await searchDouyin({ query, maxItems });
+        const lines = items.map((it) => `- "${(it.text ?? it.title ?? "").slice(0, 60)}" | ❤️${it.diggCount ?? it.likes ?? "?"} | ${it.webVideoUrl ?? it.url ?? ""}`);
+        return { content: [{ type: "text", text: `${items.length}건:\n\n${lines.join("\n")}` }] };
       } catch (e) {
         return { content: [{ type: "text", text: e.message }], isError: true };
       }
