@@ -134,7 +134,7 @@ export default function Layout() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center shrink-0">
             <Crown className="w-[18px] h-[18px] text-white" />
           </div>
-          <span className="font-bold text-slate-900">슈퍼파인더</span>
+          <span className="font-bold text-slate-900">유파인더</span>
         </Link>
         <div className="flex-1 overflow-y-auto py-4">
           <SidebarContent />
@@ -155,7 +155,7 @@ export default function Layout() {
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center">
                   <Crown className="w-[18px] h-[18px] text-white" />
                 </div>
-                <span className="font-bold text-slate-900">슈퍼파인더</span>
+                <span className="font-bold text-slate-900">유파인더</span>
               </Link>
               <button onClick={() => setDrawerOpen(false)} className="text-slate-500">
                 <X className="w-5 h-5" />

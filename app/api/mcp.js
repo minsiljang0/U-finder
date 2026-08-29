@@ -65,7 +65,7 @@ function buildServer() {
 
   server.registerTool(
     "list_tables",
-    { title: "테이블 목록", description: "슈퍼파인더 관리 DB(Supabase)의 테이블 목록." },
+    { title: "테이블 목록", description: "유파인더 관리 DB(Supabase)의 테이블 목록." },
     async () => ({ content: [{ type: "text", text: JSON.stringify(TABLES) }] })
   );
 
@@ -181,7 +181,7 @@ function buildServer() {
 
   server.registerTool(
     "get_plan",
-    { title: "PLAN.md 조회", description: "슈퍼파인더 기획서(PLAN.md, 저장소 루트) 전체 내용을 GitHub에서 가져온다." },
+    { title: "PLAN.md 조회", description: "유파인더 기획서(PLAN.md, 저장소 루트) 전체 내용을 GitHub에서 가져온다." },
     async () => {
       try {
         const data = await ghFetchFile("PLAN.md");
@@ -194,7 +194,7 @@ function buildServer() {
   );
 
   // ── 여기서부터 "회원님 대신 실제로 유튜브를 검색"하는 도구들.
-  // 슈퍼파인더 앱(브라우저)이 하는 것과 같은 일을, 서버사이드 YOUTUBE_API_KEY로 대신 수행한다.
+  // 유파인더 앱(브라우저)이 하는 것과 같은 일을, 서버사이드 YOUTUBE_API_KEY로 대신 수행한다.
 
   server.registerTool(
     "discover_channels",

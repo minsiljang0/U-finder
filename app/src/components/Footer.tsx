@@ -16,7 +16,7 @@ export default function Footer() {
           환불정책
         </Link>
       </div>
-      <div>© 2026 슈퍼파인더. All rights reserved.</div>
+      <div>© 2026 유파인더. All rights reserved.</div>
     </footer>
   );
 }

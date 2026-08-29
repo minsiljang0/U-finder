@@ -33,7 +33,7 @@ export default function Login() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-700 flex items-center justify-center mb-3">
             <Crown className="w-6 h-6 text-white" />
           </div>
-          <h1 className="font-bold text-lg text-slate-900">슈퍼파인더</h1>
+          <h1 className="font-bold text-lg text-slate-900">유파인더</h1>
           <p className="text-xs text-slate-400 mt-1">{mode === "signin" ? "로그인" : "계정 만들기"}</p>
         </div>
 

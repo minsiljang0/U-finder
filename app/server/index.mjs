@@ -74,5 +74,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[슈퍼파인더] 대본 프록시 서버 실행 중 → http://localhost:${PORT}`);
+  console.log(`[유파인더] 대본 프록시 서버 실행 중 → http://localhost:${PORT}`);
 });

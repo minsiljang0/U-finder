@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 슈퍼파인더 프로젝트 관리용 로컬 MCP 서버.
+// 유파인더 프로젝트 관리용 로컬 MCP 서버.
 // 어느 Claude Code 세션에서든(이 프로젝트를 열면) 아래 도구로 프로젝트 현황을 조회/기록할 수 있다.
 // 데이터는 Supabase(pyplpivswdbrjytfqclm)에 저장되어, 로컬 SQLite와 달리 이 프로젝트를 아는
 // 다른 도구/세션에서도 같은 데이터를 공유해서 볼 수 있다.
@@ -55,7 +55,7 @@ server.registerTool(
   "list_tables",
   {
     title: "테이블 목록",
-    description: "슈퍼파인더 관리 DB(Supabase)의 테이블 목록을 반환한다: app_config, dev_notes, known_issues, tasks",
+    description: "유파인더 관리 DB(Supabase)의 테이블 목록을 반환한다: app_config, dev_notes, known_issues, tasks",
   },
   async () => ({ content: [{ type: "text", text: JSON.stringify(TABLES) }] })
 );
@@ -148,7 +148,7 @@ server.registerTool(
 
 server.registerTool(
   "get_plan",
-  { title: "PLAN.md 조회", description: "슈퍼파인더 기획서(PLAN.md) 전체 내용을 반환한다." },
+  { title: "PLAN.md 조회", description: "유파인더 기획서(PLAN.md) 전체 내용을 반환한다." },
   async () => {
     const text = fs.existsSync(PLAN_PATH) ? fs.readFileSync(PLAN_PATH, "utf8") : "(PLAN.md 없음)";
     return { content: [{ type: "text", text }] };

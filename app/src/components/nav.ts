@@ -7,6 +7,7 @@ import {
   KeyRound,
   CreditCard,
   Sparkles,
+  Globe2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +47,13 @@ export const NAV_ITEMS: NavItem[] = [
     subtitle: "일간 조회수 기준 채널 순위",
     icon: TrendingUp,
     gradient: "from-teal-500 to-emerald-600",
+  },
+  {
+    path: "/social-search",
+    label: "멀티플랫폼 검색",
+    subtitle: "Instagram · TikTok · 샤오홍슈 · 도우인",
+    icon: Globe2,
+    gradient: "from-cyan-500 to-blue-600",
   },
   {
     path: "/favorites",

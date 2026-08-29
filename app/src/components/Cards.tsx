@@ -1,4 +1,4 @@
-import { Star } from "lucide-react";
+import { Star, Download, Check } from "lucide-react";
 import ScriptButton from "./ScriptButton";
 import { formatCount, formatRelativeDays } from "../lib/ams";
 import { toggleFavChannel, toggleFavVideo, isFavChannel, isFavVideo } from "../lib/favorites";
@@ -77,6 +77,7 @@ export interface VideoResultCardData {
 
 export function VideoResultCard({ data }: { data: VideoResultCardData }) {
   const [fav, setFav] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
     let alive = true;
@@ -97,6 +98,25 @@ export function VideoResultCard({ data }: { data: VideoResultCardData }) {
       savedAt: Date.now(),
     });
     setFav(next);
+  }
+
+  async function onSaveThumbnail(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (saveState === "saving" || saveState === "saved") return;
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/save-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: data.videoId }),
+      });
+      if (!res.ok) throw new Error();
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+      setTimeout(() => setSaveState("idle"), 2000);
+    }
   }
 
   return (
@@ -123,6 +143,17 @@ export function VideoResultCard({ data }: { data: VideoResultCardData }) {
           className="absolute bottom-2 left-2 bg-black/60 hover:bg-black/75 rounded-full p-1.5 z-10"
         >
           <Star className={`w-3.5 h-3.5 ${fav ? "fill-amber-400 text-amber-400" : "text-white"}`} />
+        </button>
+        <button
+          onClick={onSaveThumbnail}
+          title="썸네일 저장"
+          className="absolute bottom-2 left-10 bg-black/60 hover:bg-black/75 rounded-full p-1.5 z-10"
+        >
+          {saveState === "saved" ? (
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+          ) : (
+            <Download className={`w-3.5 h-3.5 ${saveState === "saving" ? "text-slate-400 animate-pulse" : saveState === "error" ? "text-red-400" : "text-white"}`} />
+          )}
         </button>
         <ScriptButton videoId={data.videoId} title={data.title} />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />

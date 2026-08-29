@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Rocket, Search } from "lucide-react";
-import { getVideosById, isShort, searchVideosMultiPage, thumbOf } from "../lib/youtube";
+import { Rocket, Search, UserSearch } from "lucide-react";
+import { getVideosById, isShort, searchVideosMultiPage, thumbOf, resolveChannelId, getChannelVideos } from "../lib/youtube";
 import { getApiKey } from "../lib/storage";
 import { computeAmsScore, computeDailyViews, daysSince, hoursSince } from "../lib/ams";
 import { ApiKeyWarning, EmptyState, ErrorBox, LoadingGrid } from "../components/StateViews";
@@ -38,7 +38,9 @@ const SORT_OPTS = [
 ];
 
 export default function ShortsFinder() {
+  const [mode, setMode] = useState<"keyword" | "channel">("keyword");
   const [q, setQ] = useState("");
+  const [channelInput, setChannelInput] = useState("");
   const [upload, setUpload] = useState("1w");
   const [maxSub, setMaxSub] = useState("none");
   const [viewRange, setViewRange] = useState("1-5w");
@@ -48,6 +50,58 @@ export default function ShortsFinder() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<(EnrichedVideo & { subscribers: number; channelThumbnail: string })[]>([]);
+  const [channelInfo, setChannelInfo] = useState<{ title: string; subscribers: number } | null>(null);
+
+  async function runChannelSearch() {
+    if (!getApiKey()) {
+      setSearched(true);
+      setError("YouTube API 키가 필요합니다. 좌측 메뉴의 'YouTube API 키 설정'에서 먼저 등록해주세요.");
+      return;
+    }
+    if (!channelInput.trim()) {
+      setSearched(true);
+      setError("채널 URL, @핸들, 또는 채널ID를 입력해주세요.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSearched(true);
+    setChannelInfo(null);
+    try {
+      const channelId = await resolveChannelId(channelInput.trim());
+      const items = await getChannelVideos({ channelId, maxResults: 20, order: sort === "date" ? "date" : "viewCount" });
+      const videoIds = [...new Set(items.map((i) => i.id.videoId!).filter(Boolean))];
+      const videos = await getVideosById(videoIds);
+      const [channel] = await getChannelsById([channelId]);
+      if (channel) setChannelInfo({ title: channel.snippet.title, subscribers: Number(channel.statistics.subscriberCount ?? 0) });
+
+      const enriched = videos.map((v) => {
+        const views = Number(v.statistics.viewCount ?? 0);
+        const days = daysSince(v.snippet.publishedAt);
+        const dailyViews = computeDailyViews(views, days);
+        const subs = Number(channel?.statistics.subscriberCount ?? 0);
+        return {
+          videoId: v.id,
+          title: v.snippet.title,
+          thumbnail: thumbOf(v.snippet),
+          channelId: v.snippet.channelId,
+          channelTitle: v.snippet.channelTitle,
+          channelThumbnail: channel ? thumbOf(channel.snippet) : "",
+          publishedAt: v.snippet.publishedAt,
+          viewCount: views,
+          dailyViews,
+          subscribers: subs,
+          ams: computeAmsScore({ dailyViews, subscribers: subs, daysSinceUpload: days }),
+          velocity: views / hoursSince(v.snippet.publishedAt),
+        };
+      });
+      setResults(enriched.sort((a, b) => b.viewCount - a.viewCount));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "채널 조회 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function runSearch() {
     if (!getApiKey()) {
@@ -130,34 +184,76 @@ export default function ShortsFinder() {
       <ApiKeyWarning />
 
       <div className="bg-white rounded-2xl p-5 mb-5">
-        <div className="relative mb-4">
-          <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            placeholder="검색어를 입력하세요 (예: 요리, 운동, 재테크...)"
-            className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-          />
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setMode("keyword")}
+            className={`flex-1 h-10 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 ${mode === "keyword" ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-500"}`}
+          >
+            <Search className="w-3.5 h-3.5" /> 키워드
+          </button>
+          <button
+            onClick={() => setMode("channel")}
+            className={`flex-1 h-10 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 ${mode === "channel" ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-500"}`}
+          >
+            <UserSearch className="w-3.5 h-3.5" /> 채널
+          </button>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <Select label="📅 업로드 일자" value={upload} onChange={setUpload} options={UPLOAD_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
-          <Select label="👤 최대 구독자" value={maxSub} onChange={setMaxSub} options={MAX_SUB_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
-          <Select label="👁 조회수 범위" value={viewRange} onChange={setViewRange} options={VIEW_RANGE_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
-          <Select label="⇅ 정렬" value={sort} onChange={setSort} options={SORT_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
-        </div>
+
+        {mode === "keyword" ? (
+          <div className="relative mb-4">
+            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runSearch()}
+              placeholder="검색어를 입력하세요 (예: 요리, 운동, 재테크...)"
+              className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            />
+          </div>
+        ) : (
+          <div className="relative mb-4">
+            <UserSearch className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              value={channelInput}
+              onChange={(e) => setChannelInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && runChannelSearch()}
+              placeholder="채널 URL, @핸들, 또는 채널ID (예: youtube.com/@mkbhd)"
+              className="w-full h-11 pl-10 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+            />
+          </div>
+        )}
+
+        {mode === "keyword" && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <Select label="📅 업로드 일자" value={upload} onChange={setUpload} options={UPLOAD_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
+            <Select label="👤 최대 구독자" value={maxSub} onChange={setMaxSub} options={MAX_SUB_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
+            <Select label="👁 조회수 범위" value={viewRange} onChange={setViewRange} options={VIEW_RANGE_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
+            <Select label="⇅ 정렬" value={sort} onChange={setSort} options={SORT_OPTS.map((o) => ({ id: o.id, label: o.label }))} />
+          </div>
+        )}
+
         <button
-          onClick={runSearch}
+          onClick={mode === "keyword" ? runSearch : runChannelSearch}
           disabled={loading}
           className="w-full h-12 rounded-xl bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
         >
           <Rocket className="w-4 h-4" />
-          떡상 쇼츠 발굴 시작
+          {mode === "keyword" ? "떡상 쇼츠 발굴 시작" : "채널 영상 가져오기"}
         </button>
       </div>
 
+      {channelInfo && (
+        <div className="bg-slate-900 text-white rounded-xl px-4 py-3 mb-4 text-sm">
+          <b>{channelInfo.title}</b> · 구독자 {channelInfo.subscribers.toLocaleString()}명
+        </div>
+      )}
+
       {!searched && (
-        <EmptyState icon="🚀" title="조건을 설정하고 발굴을 시작하세요" subtitle="검색어와 필터를 입력한 뒤 버튼을 누르면 실시간으로 유튜브를 검색합니다" />
+        <EmptyState
+          icon="🚀"
+          title={mode === "keyword" ? "조건을 설정하고 발굴을 시작하세요" : "채널을 지정해서 영상을 모아보세요"}
+          subtitle={mode === "keyword" ? "검색어와 필터를 입력한 뒤 버튼을 누르면 실시간으로 유튜브를 검색합니다" : "채널 URL이나 @핸들을 입력하면 그 채널의 영상만 가져옵니다"}
+        />
       )}
       {searched && loading && <LoadingGrid label="쇼츠를 발굴하는 중..." />}
       {searched && !loading && error && <ErrorBox message={error} />}

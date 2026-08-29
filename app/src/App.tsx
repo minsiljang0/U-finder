@@ -8,6 +8,7 @@ import ShortsFinder from "./pages/ShortsFinder";
 import Trending from "./pages/Trending";
 import ChannelRanking from "./pages/ChannelRanking";
 import Favorites from "./pages/Favorites";
+import SocialSearch from "./pages/SocialSearch";
 import ApiKeySetup from "./pages/ApiKeySetup";
 import Subscription from "./pages/Subscription";
 import Pricing from "./pages/Pricing";
@@ -72,6 +73,14 @@ export default function App() {
             element={
               <PageWithBanner>
                 <ChannelRanking />
+              </PageWithBanner>
+            }
+          />
+          <Route
+            path="/social-search"
+            element={
+              <PageWithBanner>
+                <SocialSearch />
               </PageWithBanner>
             }
           />

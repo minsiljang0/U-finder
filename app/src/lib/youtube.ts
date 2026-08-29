@@ -148,6 +148,47 @@ export async function getChannelsById(ids: string[]): Promise<YtChannel[]> {
   return results;
 }
 
+export async function resolveChannelId(input: string): Promise<string> {
+  const raw = input.trim();
+  if (/^UC[\w-]{22}$/.test(raw)) return raw;
+
+  let handle = raw;
+  const urlMatch = raw.match(/youtube\.com\/(?:channel\/(UC[\w-]{22})|@([\w.-]+)|c\/([\w.-]+)|user\/([\w.-]+))/i);
+  if (urlMatch) {
+    if (urlMatch[1]) return urlMatch[1];
+    handle = urlMatch[2] || urlMatch[3] || urlMatch[4] || raw;
+  }
+  handle = handle.replace(/^@/, "");
+
+  const byHandle = await apiGet<{ items?: { id: string }[] }>("channels", { part: "id", forHandle: `@${handle}` });
+  if (byHandle.items?.[0]?.id) return byHandle.items[0].id;
+
+  const byUsername = await apiGet<{ items?: { id: string }[] }>("channels", { part: "id", forUsername: handle });
+  if (byUsername.items?.[0]?.id) return byUsername.items[0].id;
+
+  const bySearch = await apiGet<{ items?: { snippet?: { channelId: string }; id?: { channelId: string } }[] }>("search", {
+    part: "snippet",
+    type: "channel",
+    q: raw,
+    maxResults: 1,
+  });
+  const chId = bySearch.items?.[0]?.snippet?.channelId ?? bySearch.items?.[0]?.id?.channelId;
+  if (chId) return chId;
+
+  throw new YoutubeApiError(`채널을 찾을 수 없습니다: ${raw}`);
+}
+
+export async function getChannelVideos(opts: { channelId: string; maxResults?: number; order?: "date" | "viewCount" }): Promise<YtSearchItem[]> {
+  const data = await apiGet<{ items: YtSearchItem[] }>("search", {
+    part: "snippet",
+    type: "video",
+    channelId: opts.channelId,
+    order: opts.order ?? "date",
+    maxResults: opts.maxResults ?? 20,
+  });
+  return data.items.filter((it) => it.id.videoId);
+}
+
 export async function getMostPopular(opts: {
   regionCode?: string;
   videoCategoryId?: string;
